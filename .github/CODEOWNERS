@@ -1,0 +1,6 @@
+# Default owner — review required on everything.
+* @akshaydeshpande
+
+# Infra and CI changes are the highest-blast-radius paths.
+/terraform/ @akshaydeshpande
+/.github/workflows/ @akshaydeshpande

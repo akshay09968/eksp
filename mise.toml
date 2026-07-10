@@ -1,0 +1,11 @@
+# Tool versions for this repo (https://mise.jdx.dev). Optional — brew works too;
+# CI pins its own versions. Keep in sync with .github/workflows.
+[tools]
+terraform = "1.14"
+go = "1.26"
+node = "22"
+tflint = "latest"
+kubeconform = "latest"
+kustomize = "latest"
+k6 = "latest"
+actionlint = "latest"

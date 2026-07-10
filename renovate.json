@@ -1,0 +1,28 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", ":semanticCommits", "group:allNonMajor"],
+  "labels": ["dependencies"],
+  "terraform": { "enabled": true },
+  "gomod": { "enabled": true },
+  "npm": { "enabled": true },
+  "dockerfile": { "enabled": true },
+  "github-actions": { "enabled": true },
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Helm chart versions pinned in Terraform via renovate comments",
+      "managerFilePatterns": ["/\\.tf$/", "/\\.tfvars$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>[^\\s]+)( registryUrl=(?<registryUrl>[^\\s]+))?\\s*\\n\\s*[a-zA-Z0-9_]+\\s*=\\s*\"(?<currentValue>[^\"]+)\""
+      ]
+    },
+    {
+      "customType": "regex",
+      "description": "Chart versions in ArgoCD Application manifests",
+      "managerFilePatterns": ["/^gitops/.+\\.ya?ml$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>[^\\s]+)( registryUrl=(?<registryUrl>[^\\s]+))?\\s*\\n\\s*targetRevision:\\s*\"?(?<currentValue>[^\"\\s]+)\"?"
+      ]
+    }
+  ]
+}

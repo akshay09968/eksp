@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "terraform": {
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "hashicorp/terraform-mcp-server"],
+      "description": "Terraform registry docs: look up provider resources and module inputs before writing HCL"
+    }
+  }
+}

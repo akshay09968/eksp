@@ -1,0 +1,40 @@
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraform.tfstate.lock.info
+
+# Keep lock files versioned (reproducible provider resolution)
+!.terraform.lock.hcl
+
+# Go
+apps/**/bin/
+*.test
+coverage.out
+
+# Node
+node_modules/
+apps/costwatch/frontend/dist/
+
+# costwatch: embedded SPA build output (placeholder is committed, build overwrites)
+apps/costwatch/backend/web/dist/assets/
+
+# Editors / OS
+.DS_Store
+.idea/
+*.swp
+
+# Local env & secrets — never commit
+.env
+.env.*
+*.pem
+kubeconfig*
+
+# k6 outputs
+load/k6/results/
