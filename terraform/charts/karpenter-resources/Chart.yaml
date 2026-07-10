@@ -1,0 +1,9 @@
+apiVersion: v2
+name: karpenter-resources
+description: >-
+  NodePools and EC2NodeClass for this cluster, templated from Terraform values.
+  Lives as a local chart so helm_release can render it in the same apply that
+  creates the cluster (no plan-time cluster connection needed).
+type: application
+version: 0.1.0
+appVersion: "1.13.0"

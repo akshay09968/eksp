@@ -1,0 +1,29 @@
+# Injected by terraform/modules/karpenter via helm_release values. Defaults here
+# only serve `helm lint`/`helm template` — Terraform always overrides them.
+
+clusterName: ""
+nodeIamRoleName: ""
+
+# EKS-optimized AL2023, always-latest alias (Karpenter drifts nodes on new AMIs).
+amiAlias: "al2023@latest"
+
+architectures: ["arm64", "amd64"]
+
+# Aggregate compute ceiling for each pool — the blast-radius guard.
+cpuLimitSpot: "500"
+cpuLimitOnDemand: "100"
+
+# 30 days: bounded node lifetime = fresh AMIs, defragmented capacity.
+expireAfter: "720h"
+
+# Never disrupt more than this share of nodes at once.
+disruptionBudgets:
+  - nodes: "10%"
+
+nodeVolumeSizeGi: 50
+
+connectionTracking:
+  enabled: true
+  # EC2 default is 432000s (5 days); idle established flows exhaust conntrack at
+  # high RPS long before memory does. See docs/SCALING.md.
+  tcpEstablishedTimeout: 300
