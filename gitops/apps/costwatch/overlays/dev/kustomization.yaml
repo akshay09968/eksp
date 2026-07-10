@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+
+images:
+  - name: eksp/costwatch
+    newName: 000000000000.dkr.ecr.ap-south-1.amazonaws.com/eksp/costwatch # set by scripts/configure-repo.sh
+    newTag: v0.1.0 # bumped by the CI promotion PR

@@ -340,6 +340,11 @@ key per env, **S3 native locking** (`use_lockfile`, TF ≥ 1.10 — ADR-0008). N
    (the deploy *is* a git change — closes the GitOps loop).
 4. `k8s-validate.yml`: kustomize build all overlays → kubeconform (strict, CRDs via
    schema catalog) + validate ArgoCD Application manifests.
+5. `drift.yml` (nightly cron + dispatch): per-env `terraform plan -detailed-exitcode
+   -lock=false` with the read-only OIDC role; exit code 2 opens/updates a `drift`
+   -labeled GitHub issue with the plan summary, exit 0 closes it. Two-layer drift
+   model (ADR-0016): ArgoCD handles the Kubernetes layer continuously
+   (selfHeal+prune); scheduled plans handle the AWS layer.
 
 Repo hygiene: pre-commit (terraform_fmt, tflint, gitleaks, whitespace), renovate.json
 (TF modules, helm charts via regex managers, Go, actions, Docker), PR template,
@@ -387,7 +392,9 @@ Insights · 0008 S3 native state locking · 0009 spot-first + Graviton compute s
 0010 kustomize for apps (helm for third-party charts) · 0011 Istio ambient mesh over
 sidecars/Linkerd/App Mesh(EOL)/Cilium mesh · 0012 stdlib-only sample app · 0013 ArgoCD
 over Flux · 0014 Cost Explorer API first, CUR/Athena as the opt-in deep path ·
-0015 embedded SPA (embed.FS) over separate static hosting.
+0015 embedded SPA (embed.FS) over separate static hosting · 0016 two-layer drift
+detection: ArgoCD selfHeal (k8s, continuous) + scheduled plan (AWS, nightly) over
+driftctl (deprecated) / commercial platforms.
 
 ## 14. Open items deferred to roadmap (documented, not built)
 

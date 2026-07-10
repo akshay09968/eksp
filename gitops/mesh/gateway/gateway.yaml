@@ -1,0 +1,28 @@
+# North-south API gateway (staging/prod): NLB → Istio ingress gateway (Envoy,
+# provisioned by istiod from this Gateway) → mesh. This is the in-mesh front door
+# that makes STRICT mTLS coherent end-to-end, and the attachment point for
+# gateway-tier policy (JWT authn, rate limits, header rules) as HTTPRoute/
+# AuthorizationPolicy instead of app code. ADR-0017 covers why not Amazon API
+# Gateway at this request volume (the per-request pricing math).
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: eksp-gateway
+  namespace: istio-ingress
+spec:
+  gatewayClassName: istio
+  infrastructure:
+    annotations:
+      # AWS Load Balancer Controller: internet-facing NLB straight to gateway pods.
+      service.beta.kubernetes.io/aws-load-balancer-type: external
+      service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
+      service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+  listeners:
+    - name: http
+      port: 80
+      protocol: HTTP
+      allowedRoutes:
+        namespaces:
+          from: All
+      # TLS: add a listener on 443 with certificateRefs once cert-manager or ACM
+      # provides a cert (docs/SECURITY.md hardening list).

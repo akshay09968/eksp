@@ -1,0 +1,20 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+  - netpol-hbone.yaml
+
+patches:
+  # Enroll the apps namespace in Istio ambient (ztunnel L4) and route its L7
+  # policy through the namespace waypoint.
+  - target:
+      kind: Namespace
+      name: apps
+    patch: |-
+      - op: add
+        path: /metadata/labels/istio.io~1dataplane-mode
+        value: ambient
+      - op: add
+        path: /metadata/labels/istio.io~1use-waypoint
+        value: waypoint

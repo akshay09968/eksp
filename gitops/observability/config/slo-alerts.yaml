@@ -1,0 +1,85 @@
+# Multiwindow multi-burn-rate alerting for the sample-api availability SLO
+# (99.9% of requests non-5xx). The SRE-workbook pattern: pair a fast window with
+# a long one so pages are both quick AND sustained — a 30-second blip never
+# pages, a real burn pages in minutes.
+#
+#   error budget = 0.1%. burn rate 14.4 ⇒ budget gone in 2 days (page);
+#   burn rate 6 ⇒ gone in 5 days (page); burn rate 1 ⇒ on-pace (ticket).
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: sample-api-slo
+  labels:
+    role: slo
+spec:
+  groups:
+    - name: sample-api.slo.rules
+      interval: 30s
+      rules:
+        # Recording rules: error ratio over each window we alert on.
+        - record: sample_api:error_ratio:rate5m
+          expr: |
+            sum(rate(http_requests_total{namespace="apps", app="sample-api", code=~"5.."}[5m]))
+            /
+            sum(rate(http_requests_total{namespace="apps", app="sample-api"}[5m]))
+        - record: sample_api:error_ratio:rate30m
+          expr: |
+            sum(rate(http_requests_total{namespace="apps", app="sample-api", code=~"5.."}[30m]))
+            /
+            sum(rate(http_requests_total{namespace="apps", app="sample-api"}[30m]))
+        - record: sample_api:error_ratio:rate1h
+          expr: |
+            sum(rate(http_requests_total{namespace="apps", app="sample-api", code=~"5.."}[1h]))
+            /
+            sum(rate(http_requests_total{namespace="apps", app="sample-api"}[1h]))
+        - record: sample_api:error_ratio:rate6h
+          expr: |
+            sum(rate(http_requests_total{namespace="apps", app="sample-api", code=~"5.."}[6h]))
+            /
+            sum(rate(http_requests_total{namespace="apps", app="sample-api"}[6h]))
+        - record: sample_api:error_ratio:rate3d
+          expr: |
+            sum(rate(http_requests_total{namespace="apps", app="sample-api", code=~"5.."}[3d]))
+            /
+            sum(rate(http_requests_total{namespace="apps", app="sample-api"}[3d]))
+
+    - name: sample-api.slo.alerts
+      rules:
+        - alert: SampleApiErrorBudgetFastBurn
+          expr: |
+            sample_api:error_ratio:rate5m > (14.4 * 0.001)
+            and
+            sample_api:error_ratio:rate1h > (14.4 * 0.001)
+          for: 2m
+          labels:
+            severity: critical
+            slo: sample-api-availability
+          annotations:
+            summary: "sample-api burning error budget 14.4x — exhausted in <2 days"
+            runbook_url: "https://github.com/akshaydeshpande/eksp/blob/main/docs/RUNBOOK.md#slo-fast-burn"
+
+        - alert: SampleApiErrorBudgetSlowBurn
+          expr: |
+            sample_api:error_ratio:rate30m > (6 * 0.001)
+            and
+            sample_api:error_ratio:rate6h > (6 * 0.001)
+          for: 15m
+          labels:
+            severity: critical
+            slo: sample-api-availability
+          annotations:
+            summary: "sample-api burning error budget 6x — exhausted in <5 days"
+            runbook_url: "https://github.com/akshaydeshpande/eksp/blob/main/docs/RUNBOOK.md#slo-slow-burn"
+
+        - alert: SampleApiErrorBudgetOnPaceToExhaust
+          expr: |
+            sample_api:error_ratio:rate6h > 0.001
+            and
+            sample_api:error_ratio:rate3d > 0.001
+          for: 1h
+          labels:
+            severity: warning
+            slo: sample-api-availability
+          annotations:
+            summary: "sample-api error rate above SLO for days — budget on pace to exhaust"
+            runbook_url: "https://github.com/akshaydeshpande/eksp/blob/main/docs/RUNBOOK.md#slo-ticket-burn"

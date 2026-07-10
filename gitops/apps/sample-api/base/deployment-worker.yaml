@@ -1,0 +1,71 @@
+# Same binary as sample-api, ROLE=worker: gives the mesh real east-west traffic
+# and the load tests a fan-out path without a second codebase.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sample-worker
+  labels:
+    app: sample-worker
+spec:
+  selector:
+    matchLabels:
+      app: sample-worker
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: sample-worker
+    spec:
+      serviceAccountName: sample-worker
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 45
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: sample-worker
+      containers:
+        - name: worker
+          image: eksp/sample-api:v0.0.0 # registry+tag set by overlays
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: ROLE
+              value: worker
+            - name: SHUTDOWN_DELAY
+              value: "15s"
+          resources:
+            requests:
+              cpu: 250m
+              memory: 128Mi
+            limits:
+              memory: 256Mi
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+            failureThreshold: 2
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]

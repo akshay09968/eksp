@@ -1,0 +1,99 @@
+# Default-deny ingress with explicit allowances (VPC CNI network-policy agent
+# enforces these via eBPF). Egress stays open — the compensating controls are the
+# mesh AuthorizationPolicy (staging/prod) and private subnets; full egress policy
+# is a documented hardening step in docs/SECURITY.md.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: apps
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+---
+# ALB (ip targets) reaches api pods directly from VPC addresses.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-alb-to-api
+  namespace: apps
+spec:
+  podSelector:
+    matchLabels:
+      app: sample-api
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - ipBlock:
+            cidr: 10.0.0.0/8
+      ports:
+        - port: 8080
+          protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-api-to-worker
+  namespace: apps
+spec:
+  podSelector:
+    matchLabels:
+      app: sample-worker
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: sample-api
+      ports:
+        - port: 8080
+          protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus-scrape
+  namespace: apps
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: observability
+      ports:
+        - port: 8080
+          protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: costwatch
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+---
+# costwatch stays VPC-internal (port-forward / internal LB); cost data never
+# gets a public path.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-vpc-and-scrape
+  namespace: costwatch
+spec:
+  podSelector:
+    matchLabels:
+      app: costwatch
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - ipBlock:
+            cidr: 10.0.0.0/8
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: observability
+      ports:
+        - port: 8080
+          protocol: TCP

@@ -1,0 +1,17 @@
+# Only sample-api's identity may call the worker — NetworkPolicy says "which
+# pods", this says "which cryptographic identity", and both must pass.
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: worker-only-from-api
+  namespace: apps
+spec:
+  selector:
+    matchLabels:
+      app: sample-worker
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - cluster.local/ns/apps/sa/sample-api

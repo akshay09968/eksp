@@ -1,0 +1,15 @@
+# Two tiers below system-cluster-critical. Under node pressure the eviction order
+# becomes: best-effort strangers → app-standard (unset) → app-high → platform.
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: platform-critical
+value: 100000000
+description: Platform components (observability, mesh control plane).
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: app-high
+value: 1000000
+description: Revenue-path workloads that should evict batch/best-effort first.

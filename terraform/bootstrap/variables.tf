@@ -1,7 +1,7 @@
 variable "region" {
   description = "AWS region for the state bucket, OIDC roles, and ECR repositories."
   type        = string
-  default     = "us-east-1"
+  default     = "ap-south-1"
 }
 
 variable "github_org" {

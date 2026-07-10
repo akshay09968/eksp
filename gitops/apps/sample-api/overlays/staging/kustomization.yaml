@@ -1,0 +1,22 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+
+images:
+  - name: eksp/sample-api
+    newName: 000000000000.dkr.ecr.ap-south-1.amazonaws.com/eksp/sample-api # set by scripts/configure-repo.sh
+    newTag: v0.1.0 # bumped by the CI promotion PR
+
+patches:
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: sample-api
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 3
+      - op: replace
+        path: /spec/maxReplicas
+        value: 50

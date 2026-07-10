@@ -1,0 +1,48 @@
+# prometheus-adapter: bridges Prometheus into the custom.metrics.k8s.io API so
+# HPAs can scale on requests-per-second instead of lagging CPU (ADR §SCALING).
+# Exposes http_requests_total as pod metric http_requests_per_second.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: prometheus-adapter
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: default
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: prometheus-adapter
+    # renovate: datasource=helm depName=prometheus-adapter registryUrl=https://prometheus-community.github.io/helm-charts
+    targetRevision: "5.3.0"
+    helm:
+      valuesObject:
+        prometheus:
+          url: http://kube-prometheus-stack-prometheus.observability.svc
+          port: 9090
+        replicas: 1
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            memory: 256Mi
+        rules:
+          default: false
+          custom:
+            - seriesQuery: 'http_requests_total{namespace!="",pod!=""}'
+              resources:
+                overrides:
+                  namespace: { resource: namespace }
+                  pod: { resource: pod }
+              name:
+                matches: "^(.*)_total$"
+                as: "${1}_per_second"
+              metricsQuery: sum(rate(<<.Series>>{<<.LabelMatchers>>}[2m])) by (<<.GroupBy>>)
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observability
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

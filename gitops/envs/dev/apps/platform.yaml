@@ -1,0 +1,23 @@
+# Sync waves order the world: platform (namespaces, policies, storage) lands
+# before everything that schedules into it.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/akshaydeshpande/eksp.git
+    targetRevision: main
+    path: gitops/platform/overlays/dev
+  destination:
+    server: https://kubernetes.default.svc
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true

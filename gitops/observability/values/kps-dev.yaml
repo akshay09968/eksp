@@ -1,0 +1,62 @@
+# kube-prometheus-stack values — dev: short retention, small footprint.
+# EKS hides the control-plane components kps normally scrapes; disabling those
+# targets kills the permanent "down" alerts they'd otherwise fire.
+
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeProxy:
+  enabled: false # binds metrics to 127.0.0.1 on EKS
+kubeEtcd:
+  enabled: false
+
+prometheus:
+  prometheusSpec:
+    retention: 24h
+
+    # Discover every ServiceMonitor/PodMonitor/Rule in the cluster, not only
+    # helm-labeled ones — the platform ships its own.
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    probeSelectorNilUsesHelmValues: false
+
+    resources:
+      requests:
+        cpu: 250m
+        memory: 1Gi
+      limits:
+        memory: 2Gi
+
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: gp3
+          accessModes: [ReadWriteOnce]
+          resources:
+            requests:
+              storage: 20Gi
+
+grafana:
+  # Password: kubectl -n observability get secret kube-prometheus-stack-grafana \
+  #   -o jsonpath='{.data.admin-password}' | base64 -d
+  sidecar:
+    dashboards:
+      enabled: true
+      searchNamespace: ALL
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+
+alertmanager:
+  alertmanagerSpec:
+    resources:
+      requests:
+        cpu: 25m
+        memory: 64Mi
+      limits:
+        memory: 128Mi

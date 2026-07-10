@@ -1,0 +1,22 @@
+# Absolute maxUnavailable in the base: a percentage of 2 replicas rounds down to
+# 0 and would block every drain. Prod overrides to 10% once replica counts are
+# large enough for percentages to mean something.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: sample-api
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: sample-api
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: sample-worker
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: sample-worker

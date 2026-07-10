@@ -100,6 +100,13 @@ resource "helm_release" "external_dns" {
   chart      = "external-dns"
   version    = var.external_dns_chart_version
 
+  lifecycle {
+    precondition {
+      condition     = length(var.route53_zone_arns) > 0 && length(var.domain_filters) > 0
+      error_message = "enable_external_dns requires explicit route53_zone_arns and domain_filters — refusing account-wide DNS write access."
+    }
+  }
+
   values = [yamlencode(merge(local.system_scheduling, {
     provider = { name = "aws" }
 
@@ -151,6 +158,13 @@ resource "helm_release" "cert_manager" {
   repository       = "https://charts.jetstack.io"
   chart            = "cert-manager"
   version          = var.cert_manager_chart_version
+
+  lifecycle {
+    precondition {
+      condition     = length(var.route53_zone_arns) > 0
+      error_message = "enable_cert_manager requires explicit route53_zone_arns — refusing account-wide DNS write access."
+    }
+  }
 
   values = [yamlencode({
     crds = { enabled = true }

@@ -1,0 +1,27 @@
+# Resilience as platform policy, not app code: calls to the worker service get a
+# tight timeout and one retry on connection-level failures. Enforced at the
+# waypoint — applies to every caller uniformly.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: sample-worker
+  namespace: apps
+spec:
+  parentRefs:
+    - group: ""
+      kind: Service
+      name: sample-worker
+      port: 80
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      timeouts:
+        request: 2s
+      retry:
+        attempts: 1
+        codes: [502, 503]
+      backendRefs:
+        - name: sample-worker
+          port: 80

@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sample-api
+  labels:
+    app: sample-api
+spec:
+  # replicas intentionally unset — the HPA owns it; setting both makes ArgoCD
+  # and the HPA fight.
+  selector:
+    matchLabels:
+      app: sample-api
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 0 # never dip below capacity during deploys at high RPS
+  template:
+    metadata:
+      labels:
+        app: sample-api
+    spec:
+      serviceAccountName: sample-api
+      automountServiceAccountToken: false
+      priorityClassName: app-high
+      # 45s > SHUTDOWN_DELAY (15s) + ALB deregistration (30s max in-flight drain):
+      # the pod outlives everything that might still route to it.
+      terminationGracePeriodSeconds: 45
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: sample-api
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: sample-api
+      containers:
+        - name: api
+          image: eksp/sample-api:v0.0.0 # registry+tag set by overlays
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: ROLE
+              value: api
+            - name: WORKER_URL
+              value: http://sample-worker.apps.svc.cluster.local
+            # Distroless has no shell for a preStop sleep — the app implements
+            # the drain itself: SIGTERM → /readyz fails → keep serving 15s while
+            # endpoints/ALB deregister → graceful shutdown.
+            - name: SHUTDOWN_DELAY
+              value: "15s"
+          resources:
+            requests:
+              cpu: 250m
+              memory: 128Mi
+            limits:
+              # No CPU limit by design (docs/adr/0012): throttling a
+              # latency-sensitive service costs more than it protects.
+              memory: 256Mi
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+            failureThreshold: 2
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]

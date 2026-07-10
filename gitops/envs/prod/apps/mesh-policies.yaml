@@ -1,0 +1,21 @@
+# STRICT mTLS, api→worker authorization, the namespace waypoint, and worker
+# retry/timeout policy — see gitops/mesh/policies/.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mesh-policies
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/akshaydeshpande/eksp.git
+    targetRevision: main
+    path: gitops/mesh/policies
+  destination:
+    server: https://kubernetes.default.svc
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

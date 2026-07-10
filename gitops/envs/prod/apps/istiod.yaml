@@ -1,0 +1,41 @@
+# Istio control plane, ambient profile: no sidecar injection anywhere; the data
+# plane is ztunnel (L4) + optional waypoints (L7). ADR-0011.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: istiod
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+spec:
+  project: default
+  source:
+    repoURL: https://istio-release.storage.googleapis.com/charts
+    chart: istiod
+    # renovate: datasource=helm depName=istiod registryUrl=https://istio-release.storage.googleapis.com/charts
+    targetRevision: "1.30.2"
+    helm:
+      valuesObject:
+        profile: ambient
+        pilot:
+          nodeSelector:
+            eksp.io/node-role: system
+          tolerations:
+            - key: CriticalAddonsOnly
+              operator: Exists
+              effect: NoSchedule
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              memory: 1Gi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: istio-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true

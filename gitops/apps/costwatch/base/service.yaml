@@ -1,0 +1,16 @@
+# ClusterIP only — cost data stays private. Access: make costwatch-ui
+# (port-forward); an oauth2-proxy-fronted internal ALB is the documented
+# hardening step (docs/SECURITY.md).
+apiVersion: v1
+kind: Service
+metadata:
+  name: costwatch
+  labels:
+    app: costwatch
+spec:
+  selector:
+    app: costwatch
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

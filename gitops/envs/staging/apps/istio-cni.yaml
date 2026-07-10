@@ -1,0 +1,35 @@
+# istio-cni node agent (ambient): redirects pod traffic into ztunnel. Chained
+# after the VPC CNI — it does not replace it.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: istio-cni
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+spec:
+  project: default
+  source:
+    repoURL: https://istio-release.storage.googleapis.com/charts
+    chart: cni
+    # renovate: datasource=helm depName=cni registryUrl=https://istio-release.storage.googleapis.com/charts
+    targetRevision: "1.30.2"
+    helm:
+      valuesObject:
+        profile: ambient
+        cni:
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 256Mi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: istio-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true

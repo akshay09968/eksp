@@ -1,0 +1,10 @@
+# Zero-trust east-west: every workload in apps must speak mTLS. Plaintext
+# stragglers fail fast instead of silently bypassing identity.
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: strict-mtls
+  namespace: apps
+spec:
+  mtls:
+    mode: STRICT

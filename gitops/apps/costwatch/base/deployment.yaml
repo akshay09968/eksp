@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: costwatch
+  labels:
+    app: costwatch
+spec:
+  # Single replica on purpose: the CE cache is per-pod in-memory; a second pod
+  # halves hit rate and doubles the (paid) CE calls. Brief unavailability during
+  # reschedule is acceptable for an internal tool.
+  replicas: 1
+  selector:
+    matchLabels:
+      app: costwatch
+  template:
+    metadata:
+      labels:
+        app: costwatch
+    spec:
+      serviceAccountName: costwatch
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: costwatch
+          image: eksp/costwatch:v0.0.0 # registry+tag set by overlays
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            # Cost Explorer's API endpoint lives in us-east-1 regardless of
+            # where the cluster runs.
+            - name: AWS_REGION
+              value: us-east-1
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              memory: 256Mi
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            periodSeconds: 15
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]

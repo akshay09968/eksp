@@ -1,0 +1,14 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: costwatch
+spec:
+  selector:
+    matchLabels:
+      app: costwatch
+  targetLabels:
+    - app
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s

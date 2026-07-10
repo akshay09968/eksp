@@ -1,0 +1,54 @@
+# Operational alerts the kube-prometheus-stack defaults don't cover. Everything
+# node/pod-generic (CrashLoopBackOff, NodeNotReady, PV filling) already ships
+# with kps — duplicating it here would double-page.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: eksp-ops
+  labels:
+    role: ops
+spec:
+  groups:
+    - name: eksp.capacity
+      rules:
+        - alert: HpaAtMaxReplicas
+          expr: |
+            kube_horizontalpodautoscaler_status_current_replicas
+              >= kube_horizontalpodautoscaler_spec_max_replicas
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "HPA {{ $labels.namespace }}/{{ $labels.horizontalpodautoscaler }} pinned at max — no headroom left"
+            runbook_url: "https://github.com/akshaydeshpande/eksp/blob/main/docs/RUNBOOK.md#hpa-at-max"
+
+        - alert: PodsPendingTooLong
+          expr: |
+            sum by (namespace) (kube_pod_status_phase{phase="Pending"}) > 0
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Pods pending >15m in {{ $labels.namespace }} — Karpenter not placing them"
+            runbook_url: "https://github.com/akshaydeshpande/eksp/blob/main/docs/RUNBOOK.md#pods-pending"
+
+        - alert: SampleApiP99LatencyHigh
+          expr: |
+            histogram_quantile(0.99,
+              sum by (le) (rate(http_request_duration_seconds_bucket{namespace="apps", app="sample-api"}[5m]))
+            ) > 0.15
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "sample-api p99 above the 150ms design target"
+            runbook_url: "https://github.com/akshaydeshpande/eksp/blob/main/docs/RUNBOOK.md#latency-high"
+
+        - alert: CostwatchDown
+          expr: up{namespace="costwatch"} == 0
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "costwatch target down — cost visibility lost"
+            runbook_url: "https://github.com/akshaydeshpande/eksp/blob/main/docs/RUNBOOK.md#costwatch-down"

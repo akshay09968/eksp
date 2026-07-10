@@ -1,0 +1,18 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: sample-api
+spec:
+  selector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values: [sample-api, sample-worker]
+  # Propagate the service's app label onto every series — the SLO rules and the
+  # RED dashboard select on it.
+  targetLabels:
+    - app
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s

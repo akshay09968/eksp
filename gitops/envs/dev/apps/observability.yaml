@@ -1,0 +1,34 @@
+# kube-prometheus-stack: chart from upstream, values from this repo (multi-source
+# $values pattern). ServerSideApply is required — the CRDs exceed the client-side
+# annotation size limit.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: observability
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: default
+  sources:
+    - repoURL: https://prometheus-community.github.io/helm-charts
+      chart: kube-prometheus-stack
+      # renovate: datasource=helm depName=kube-prometheus-stack registryUrl=https://prometheus-community.github.io/helm-charts
+      targetRevision: "87.12.3"
+      helm:
+        releaseName: kube-prometheus-stack
+        valueFiles:
+          - $values/gitops/observability/values/kps-dev.yaml
+    - repoURL: https://github.com/akshaydeshpande/eksp.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observability
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
+      - CreateNamespace=false # platform owns namespaces (PSS labels live there)

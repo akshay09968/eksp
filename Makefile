@@ -2,7 +2,7 @@ SHELL := /usr/bin/env bash
 .DEFAULT_GOAL := help
 
 ENV ?= dev
-REGION ?= us-east-1
+REGION ?= ap-south-1
 TF_DIR := terraform/envs/$(ENV)
 TF_ROOTS := terraform/bootstrap terraform/envs/dev terraform/envs/staging terraform/envs/prod
 

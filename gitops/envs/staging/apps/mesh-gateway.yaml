@@ -1,0 +1,22 @@
+# The north-south API gateway (NLB → Istio ingress gateway). See ADR-0017.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mesh-gateway
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/akshaydeshpande/eksp.git
+    targetRevision: main
+    path: gitops/mesh/gateway
+  destination:
+    server: https://kubernetes.default.svc
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true

@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: apps
+
+# North-south entry is per-env, not in this base: dev exposes a plain ALB
+# Ingress (overlay); staging/prod enter through the Istio ingress gateway
+# (gitops/mesh/gateway) because STRICT ambient mTLS rejects plaintext from an
+# out-of-mesh ALB targeting pods directly.
+resources:
+  - serviceaccounts.yaml
+  - deployment-api.yaml
+  - deployment-worker.yaml
+  - services.yaml
+  - hpa.yaml
+  - pdb.yaml
+  - servicemonitor.yaml

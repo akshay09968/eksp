@@ -1,0 +1,17 @@
+# Namespace waypoint: the L7 half of ambient. ztunnel gives L4 mTLS everywhere;
+# traffic to services in this namespace additionally transits this Envoy for
+# HTTPRoute policy (retries/timeouts) and L7 telemetry. Deployed by istiod from
+# this Gateway definition.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: waypoint
+  namespace: apps
+  labels:
+    istio.io/waypoint-for: service
+spec:
+  gatewayClassName: istio-waypoint
+  listeners:
+    - name: mesh
+      port: 15008
+      protocol: HBONE

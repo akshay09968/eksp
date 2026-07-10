@@ -1,0 +1,31 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sample-api
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip # ALB → pod, no NodePort hop (ADR-0006)
+    alb.ingress.kubernetes.io/healthcheck-path: /healthz
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+    # Deregistration 30s pairs with the app's 15s drain: targets stop receiving
+    # new requests immediately, in-flight requests get 30s to finish.
+    # least_outstanding_requests beats round_robin under heterogeneous pod load.
+    alb.ingress.kubernetes.io/target-group-attributes: >-
+      deregistration_delay.timeout_seconds=30,
+      load_balancing.algorithm.type=least_outstanding_requests
+    alb.ingress.kubernetes.io/load-balancer-attributes: >-
+      idle_timeout.timeout_seconds=60
+    # TLS: add certificate-arn + ssl-redirect annotations once you have a domain
+    # (cert-manager/external-dns flags in terraform/modules/addons).
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: sample-api
+                port:
+                  number: 80

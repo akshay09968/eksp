@@ -34,15 +34,20 @@ variable "external_dns_chart_version" {
 }
 
 variable "domain_filters" {
-  description = "Domains external-dns is allowed to manage (empty = all zones in the account — set this)."
+  description = "Domains external-dns is allowed to manage. Required (non-empty) when enable_external_dns is true — an unfiltered external-dns can rewrite every zone it can reach."
   type        = list(string)
   default     = []
 }
 
 variable "route53_zone_arns" {
-  description = "Hosted zone ARNs external-dns/cert-manager may write to."
+  description = "Explicit hosted zone ARNs external-dns/cert-manager may write to. Required (non-empty) when either flag is enabled; deliberately no wildcard default."
   type        = list(string)
-  default     = ["arn:aws:route53:::hostedzone/*"]
+  default     = []
+
+  validation {
+    condition     = !contains(var.route53_zone_arns, "arn:aws:route53:::hostedzone/*")
+    error_message = "Pass specific hosted zone ARNs, not the account-wide wildcard."
+  }
 }
 
 variable "enable_cert_manager" {

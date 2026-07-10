@@ -1,0 +1,30 @@
+# gp3 becomes the default StorageClass (cheaper + independently tunable
+# IOPS/throughput vs gp2). The stock gp2 class is demoted via ServerSideApply —
+# ArgoCD patches the EKS-created object instead of fighting it.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gp3
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: ebs.csi.aws.com
+parameters:
+  type: gp3
+  encrypted: "true"
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+reclaimPolicy: Delete
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gp2
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "false"
+    argocd.argoproj.io/sync-options: ServerSideApply=true
+provisioner: kubernetes.io/aws-ebs
+parameters:
+  fsType: ext4
+  type: gp2
+volumeBindingMode: WaitForFirstConsumer
+reclaimPolicy: Delete
