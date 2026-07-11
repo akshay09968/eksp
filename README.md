@@ -117,8 +117,10 @@ docs/        ARCHITECTURE · SCALING · RUNBOOK · COST · SECURITY · INTERVIEW
 - [RUNBOOK.md](docs/RUNBOOK.md) — operations: upgrades, drains, drift, incident trees (alerts link here)
 - [COST.md](docs/COST.md) — what each env costs and which levers move it
 - [SECURITY.md](docs/SECURITY.md) — threat model, controls, hardening backlog
+- [AUDIT.md](docs/AUDIT.md) — self-audit: prioritized weaknesses, measured coverage gaps, refactoring candidates
+- [COMPLIANCE.md](docs/COMPLIANCE.md) — SOC2/GDPR/HIPAA code-level readiness, honestly scored
 - [INTERVIEW.md](docs/INTERVIEW.md) — how to walk a panel through this repo
-- [docs/adr/](docs/adr/) — 17 decision records, including the rejected options
+- [docs/adr/](docs/adr/) — 18 decision records, including the rejected options
 
 ## Roadmap (deliberately not built — see ADRs for why)
 
