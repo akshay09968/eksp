@@ -20,7 +20,7 @@ spec:
             severity: warning
           annotations:
             summary: "HPA {{ $labels.namespace }}/{{ $labels.horizontalpodautoscaler }} pinned at max — no headroom left"
-            runbook_url: "https://github.com/akshaydeshpande/eksp/blob/main/docs/RUNBOOK.md#hpa-at-max"
+            runbook_url: "https://github.com/akshay09968/eksp/blob/main/docs/RUNBOOK.md#hpa-at-max"
 
         - alert: PodsPendingTooLong
           expr: |
@@ -30,7 +30,7 @@ spec:
             severity: warning
           annotations:
             summary: "Pods pending >15m in {{ $labels.namespace }} — Karpenter not placing them"
-            runbook_url: "https://github.com/akshaydeshpande/eksp/blob/main/docs/RUNBOOK.md#pods-pending"
+            runbook_url: "https://github.com/akshay09968/eksp/blob/main/docs/RUNBOOK.md#pods-pending"
 
         - alert: SampleApiP99LatencyHigh
           expr: |
@@ -42,7 +42,7 @@ spec:
             severity: warning
           annotations:
             summary: "sample-api p99 above the 150ms design target"
-            runbook_url: "https://github.com/akshaydeshpande/eksp/blob/main/docs/RUNBOOK.md#latency-high"
+            runbook_url: "https://github.com/akshay09968/eksp/blob/main/docs/RUNBOOK.md#latency-high"
 
         - alert: CostwatchDown
           expr: up{namespace="costwatch"} == 0
@@ -51,4 +51,4 @@ spec:
             severity: warning
           annotations:
             summary: "costwatch target down — cost visibility lost"
-            runbook_url: "https://github.com/akshaydeshpande/eksp/blob/main/docs/RUNBOOK.md#costwatch-down"
+            runbook_url: "https://github.com/akshay09968/eksp/blob/main/docs/RUNBOOK.md#costwatch-down"

@@ -56,7 +56,7 @@ spec:
             slo: sample-api-availability
           annotations:
             summary: "sample-api burning error budget 14.4x — exhausted in <2 days"
-            runbook_url: "https://github.com/akshaydeshpande/eksp/blob/main/docs/RUNBOOK.md#slo-fast-burn"
+            runbook_url: "https://github.com/akshay09968/eksp/blob/main/docs/RUNBOOK.md#slo-fast-burn"
 
         - alert: SampleApiErrorBudgetSlowBurn
           expr: |
@@ -69,7 +69,7 @@ spec:
             slo: sample-api-availability
           annotations:
             summary: "sample-api burning error budget 6x — exhausted in <5 days"
-            runbook_url: "https://github.com/akshaydeshpande/eksp/blob/main/docs/RUNBOOK.md#slo-slow-burn"
+            runbook_url: "https://github.com/akshay09968/eksp/blob/main/docs/RUNBOOK.md#slo-slow-burn"
 
         - alert: SampleApiErrorBudgetOnPaceToExhaust
           expr: |
@@ -82,4 +82,4 @@ spec:
             slo: sample-api-availability
           annotations:
             summary: "sample-api error rate above SLO for days — budget on pace to exhaust"
-            runbook_url: "https://github.com/akshaydeshpande/eksp/blob/main/docs/RUNBOOK.md#slo-ticket-burn"
+            runbook_url: "https://github.com/akshay09968/eksp/blob/main/docs/RUNBOOK.md#slo-ticket-burn"

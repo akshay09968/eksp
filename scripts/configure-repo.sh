@@ -11,7 +11,7 @@ REGISTRY="${2:?usage: configure-repo.sh <git-https-url> <ecr-registry>}"
 
 cd "$(dirname "$0")/.."
 
-PLACEHOLDER_REPO="https://github.com/akshaydeshpande/eksp.git"
+PLACEHOLDER_REPO="https://github.com/akshay09968/eksp.git"
 PLACEHOLDER_REGISTRY="000000000000.dkr.ecr.ap-south-1.amazonaws.com"
 
 grep -rl "$PLACEHOLDER_REPO" gitops/ | while IFS= read -r f; do

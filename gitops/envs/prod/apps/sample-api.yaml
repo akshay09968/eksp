@@ -8,7 +8,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/akshaydeshpande/eksp.git
+    repoURL: https://github.com/akshay09968/eksp.git
     targetRevision: main
     path: gitops/apps/sample-api/overlays/prod
   destination:
