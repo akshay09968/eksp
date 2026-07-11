@@ -9,6 +9,23 @@ ULP level (map-iteration order × float non-associativity; 11/25 test-run
 failures). Root-caused and fixed in `demo.go` — kept here as evidence the
 audit method (run suites repeatedly, don't trust one green run) earns its cost.
 
+## Remediation log (2026-07-11, same day)
+
+| Finding | Status |
+|---|---|
+| P0-1 TAG-groupBy paid-query surface | ✅ closed by default; `ALLOWED_TAG_KEYS` allowlist, TDD'd |
+| P0-2 public-repo plan/drift leakage | ✅ jobs refuse public repos unless `ALLOW_PUBLIC_PLAN_OUTPUT` set consciously |
+| P0-3 external TLS | ⏳ open — needs a domain/cert decision (flags exist) |
+| P1-4 cache never evicts | ✅ sweep-on-write + 256-entry hard cap, tested |
+| P1-5 partial-apply recovery undocumented | ✅ RUNBOOK §"Partial apply failed" |
+| P1-7 macOS-only sed | ✅ portable `sedi()` |
+| P1-8 env drift unnoticed | ✅ `scripts/check-env-parity.sh` in `make check` + CI |
+| Coverage: TF modules 1/5 | ✅ 5/5 — validation suites with `override_module` stubs (10 cases) |
+| Coverage: frontend 0 tests | ✅ vitest, 13 tests (format edge cases, palette slot stability) |
+| Coverage: ArgoCD path references unchecked | ✅ `scripts/check-gitops-paths.sh` wired into validate-manifests |
+| Coverage: no CI coverage gate / k6 lint | ✅ floors 65/75% in app CI; `load-lint.yml` parses every scenario |
+| P1-6 `depends_on` plan noise · P1-9 NodeLocal IP assumption · P2 items | ⏳ open, tracked above |
+
 ## P0 — fix before operating against a real account
 
 | # | Finding | Why it matters | Fix sketch | Effort |

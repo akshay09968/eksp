@@ -39,10 +39,13 @@ jobs:
             terraform -chdir="$d" validate
           done
 
-      - name: terraform test (mocked, offline)
+      - name: terraform test (mocked, offline — all modules with tests)
         run: |
-          terraform -chdir=terraform/modules/network init -backend=false -input=false >/dev/null
-          terraform -chdir=terraform/modules/network test
+          for d in terraform/modules/*/tests; do
+            m=$(dirname "$d"); echo "== $m"
+            terraform -chdir="$m" init -backend=false -input=false >/dev/null
+            terraform -chdir="$m" test
+          done
 
       - uses: terraform-linters/setup-tflint@v4
 
@@ -51,6 +54,9 @@ jobs:
 
       - name: helm lint (karpenter-resources chart)
         run: helm lint terraform/charts/karpenter-resources
+
+      - name: env parity guard (ADR-0002)
+        run: ./scripts/check-env-parity.sh
 
   checkov:
     name: checkov security scan

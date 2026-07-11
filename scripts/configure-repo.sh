@@ -11,16 +11,25 @@ REGISTRY="${2:?usage: configure-repo.sh <git-https-url> <ecr-registry>}"
 
 cd "$(dirname "$0")/.."
 
+# Portable in-place sed: BSD (macOS) needs -i '', GNU needs -i (AUDIT P1-7).
+sedi() {
+  if sed --version >/dev/null 2>&1; then
+    sed -i "$@"
+  else
+    sed -i '' "$@"
+  fi
+}
+
 PLACEHOLDER_REPO="https://github.com/akshay09968/eksp.git"
 PLACEHOLDER_REGISTRY="000000000000.dkr.ecr.ap-south-1.amazonaws.com"
 
 grep -rl "$PLACEHOLDER_REPO" gitops/ | while IFS= read -r f; do
-  sed -i '' "s|$PLACEHOLDER_REPO|$REPO_URL|g" "$f"
+  sedi "s|$PLACEHOLDER_REPO|$REPO_URL|g" "$f"
   echo "repo url  → $f"
 done
 
 grep -rl "$PLACEHOLDER_REGISTRY" gitops/ | while IFS= read -r f; do
-  sed -i '' "s|$PLACEHOLDER_REGISTRY|$REGISTRY|g" "$f"
+  sedi "s|$PLACEHOLDER_REGISTRY|$REGISTRY|g" "$f"
   echo "registry  → $f"
 done
 

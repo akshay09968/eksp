@@ -59,10 +59,11 @@ jobs:
           cache: npm
           cache-dependency-path: apps/costwatch/frontend/package-lock.json
 
-      - name: build
+      - name: test + build
         working-directory: apps/costwatch/frontend
         run: |
           npm ci
+          npm run test
           npm run build
 
   publish:

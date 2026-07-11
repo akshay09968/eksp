@@ -126,6 +126,23 @@ Raise HPA max + Karpenter ceilings ahead of time (PR to overlays + env tf),
 pre-warm the LB (§SCALING), schedule a disruption-budget freeze window, run
 `k6 ramp` at the expected peak in staging first.
 
+### Partial apply failed (helm provider errors mid-apply)
+
+The env roots configure the helm provider from `module.eks` outputs in the same
+apply (documented single-apply pattern, ADR-0004). If an apply dies *while the
+cluster is half-created*, subsequent plans can fail at helm-provider init with
+connection errors that mask the real problem.
+
+Recovery, in order:
+
+1. `terraform apply -target=module.network -target=module.eks` — converge the
+   cluster itself first (targeted apply is fine *as a recovery step*).
+2. Then a plain `make apply ENV=<env>` — helm provider now has a live endpoint;
+   the remaining releases converge.
+3. Still failing? `aws eks describe-cluster --name eksp-<env>` — if the cluster
+   is ACTIVE and helm still can't connect, it's credentials/network
+   (`aws eks get-token`, endpoint CIDRs), not Terraform.
+
 ### State lock stuck
 
 S3-native lock (no DynamoDB): `terraform force-unlock <lock-id>` after

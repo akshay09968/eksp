@@ -38,12 +38,22 @@ variable "cpu_limit_spot" {
   description = "Aggregate vCPU ceiling for the spot pool (blast-radius guard)."
   type        = number
   default     = 500
+
+  validation {
+    condition     = var.cpu_limit_spot > 0
+    error_message = "cpu_limit_spot must be positive — a zero ceiling means Karpenter can never provision."
+  }
 }
 
 variable "cpu_limit_on_demand" {
   description = "Aggregate vCPU ceiling for the on-demand fallback pool."
   type        = number
   default     = 100
+
+  validation {
+    condition     = var.cpu_limit_on_demand > 0
+    error_message = "cpu_limit_on_demand must be positive — the fallback pool is the spot-crunch escape hatch."
+  }
 }
 
 variable "node_volume_size_gi" {

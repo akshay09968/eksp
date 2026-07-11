@@ -44,9 +44,12 @@ validate: ## terraform validate every root (offline)
 	done
 
 .PHONY: tf-test
-tf-test: ## Run terraform native tests (mocked, offline)
-	terraform -chdir=terraform/modules/network init -backend=false -input=false >/dev/null
-	terraform -chdir=terraform/modules/network test
+tf-test: ## Run terraform native tests (mocked, offline) for every module with tests
+	@for d in terraform/modules/*/tests; do \
+		m=$$(dirname $$d); echo "== $$m"; \
+		terraform -chdir=$$m init -backend=false -input=false >/dev/null; \
+		terraform -chdir=$$m test || exit 1; \
+	done
 
 .PHONY: helm-lint
 helm-lint: ## Lint local charts
@@ -65,8 +68,16 @@ app-test: ## Unit-test both applications
 frontend-build: ## Typecheck + build costwatch UI (emits into backend/web/dist)
 	cd apps/costwatch/frontend && npm ci && npm run build
 
+.PHONY: frontend-test
+frontend-test: ## Unit-test the costwatch UI (vitest)
+	cd apps/costwatch/frontend && npm run test
+
+.PHONY: env-parity
+env-parity: ## Shared env files must not silently diverge (ADR-0002 guard)
+	./scripts/check-env-parity.sh
+
 .PHONY: check
-check: fmt-check lint validate tf-test helm-lint kubeconform app-test ## Everything CI runs, locally
+check: fmt-check lint validate tf-test helm-lint kubeconform app-test env-parity ## Everything CI runs, locally
 
 ##@ Deploy (requires AWS credentials — intentionally explicit)
 

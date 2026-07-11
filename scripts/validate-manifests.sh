@@ -33,4 +33,9 @@ for dir in gitops/envs/*/apps; do
   fi
 done
 
+echo "== cross-layer: Application path references resolve"
+if ! ./scripts/check-gitops-paths.sh; then
+  fail=1
+fi
+
 exit "$fail"
