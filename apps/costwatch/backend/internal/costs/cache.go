@@ -20,6 +20,11 @@ type cache struct {
 	misses atomic.Int64
 }
 
+// maxCacheEntries hard-caps the map even if nothing has expired: with the tag
+// allowlist this is belt-and-braces, but a cache keyed on request shape must
+// never be allowed to grow with attacker-chosen inputs (AUDIT P0-1/P1-4).
+const maxCacheEntries = 256
+
 type cacheEntry struct {
 	val any
 	exp time.Time
@@ -70,11 +75,33 @@ func (c *cache) do(key string, fn func() (any, error)) (any, bool, error) {
 	c.mu.Lock()
 	delete(c.inflight, key)
 	if call.err == nil {
+		c.sweepLocked()
 		c.entries[key] = cacheEntry{val: call.val, exp: time.Now().Add(c.ttl)}
 	}
 	c.mu.Unlock()
 
 	return call.val, false, call.err
+}
+
+// sweepLocked drops expired entries, then enforces the hard cap by evicting
+// the entries closest to expiry. Caller holds c.mu.
+func (c *cache) sweepLocked() {
+	now := time.Now()
+	for k, e := range c.entries {
+		if now.After(e.exp) {
+			delete(c.entries, k)
+		}
+	}
+	for len(c.entries) >= maxCacheEntries {
+		var oldestKey string
+		var oldestExp time.Time
+		for k, e := range c.entries {
+			if oldestKey == "" || e.exp.Before(oldestExp) {
+				oldestKey, oldestExp = k, e.exp
+			}
+		}
+		delete(c.entries, oldestKey)
+	}
 }
 
 type CacheStats struct {

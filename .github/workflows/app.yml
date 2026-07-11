@@ -24,8 +24,10 @@ jobs:
         include:
           - app: sample-api
             dir: apps/sample-api
+            coverage_floor: 65
           - app: costwatch
             dir: apps/costwatch/backend
+            coverage_floor: 75
     steps:
       - uses: actions/checkout@v4
 
@@ -34,11 +36,16 @@ jobs:
           go-version-file: ${{ matrix.dir }}/go.mod
           cache-dependency-path: ${{ matrix.dir }}/go.sum
 
-      - name: vet + test
+      - name: vet + test (race) + coverage floor
         working-directory: ${{ matrix.dir }}
+        env:
+          FLOOR: ${{ matrix.coverage_floor }}
         run: |
           go vet ./...
-          go test -race ./...
+          go test -race -coverprofile=cover.out ./...
+          total=$(go tool cover -func=cover.out | tail -1 | awk '{sub("%","",$3); print $3}')
+          echo "coverage: ${total}% (floor: ${FLOOR}%)"
+          awk -v t="$total" -v f="$FLOOR" 'BEGIN { exit (t+0 < f+0) ? 1 : 0 }'
 
   frontend:
     name: costwatch UI typecheck + build

@@ -70,12 +70,15 @@ jobs:
 
   plan:
     name: plan (${{ matrix.env }})
-    # Same-repo PRs only (fork PRs get no OIDC token), and only when the repo
-    # has the role configured; forks/fresh clones skip cleanly instead of failing.
+    # Same-repo PRs only (fork PRs get no OIDC token), only when the role is
+    # configured, and never on a public repo unless explicitly overridden —
+    # plan output (resource names, CIDRs, account topology) lands in public
+    # logs/comments otherwise (AUDIT P0-2).
     if: >-
       github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
-      vars.AWS_PLAN_ROLE_ARN != ''
+      vars.AWS_PLAN_ROLE_ARN != '' &&
+      (github.event.repository.private || vars.ALLOW_PUBLIC_PLAN_OUTPUT == 'true')
     needs: [static]
     runs-on: ubuntu-latest
     permissions:

@@ -3,6 +3,7 @@ package costs
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -276,5 +277,67 @@ func TestDemoModeIsDeterministic(t *testing.T) {
 	// hourly must work in demo without any opt-in
 	if _, err := svc.Costs(context.Background(), Query{Granularity: Hourly, GroupBy: "SERVICE", Days: 1}); err != nil {
 		t.Fatalf("demo hourly: %v", err)
+	}
+}
+
+func TestTagGroupByRequiresAllowlist(t *testing.T) {
+	m := &mockCE{pages: []*costexplorer.GetCostAndUsageOutput{
+		page(nil, resultAt("2026-07-01", map[string]string{"team-a": "1"})),
+	}}
+
+	// no allowlist configured → every TAG: key is rejected before any paid call
+	svc := NewService(m, WithTTL(time.Hour))
+	_, err := svc.Costs(context.Background(), Query{Granularity: Daily, GroupBy: "TAG:team", Days: 7})
+	if err == nil || !strings.Contains(err.Error(), "unsupported") {
+		t.Fatalf("err = %v, want unsupported-tag rejection", err)
+	}
+	if m.calls.Load() != 0 {
+		t.Fatal("CE must not be called for a disallowed tag key")
+	}
+
+	// allowlisted key passes; a different key still fails
+	svc = NewService(m, WithTTL(time.Hour), WithAllowedTagKeys([]string{"team"}))
+	if _, err := svc.Costs(context.Background(), Query{Granularity: Daily, GroupBy: "TAG:team", Days: 7}); err != nil {
+		t.Fatalf("allowlisted tag rejected: %v", err)
+	}
+	if _, err := svc.Costs(context.Background(), Query{Granularity: Daily, GroupBy: "TAG:owner", Days: 7}); err == nil {
+		t.Fatal("non-allowlisted tag accepted")
+	}
+}
+
+func TestCacheEvictsExpiredAndBoundsSize(t *testing.T) {
+	c := newCache(10 * time.Millisecond)
+
+	for i := range 5 {
+		key := fmt.Sprintf("k%d", i)
+		if _, _, err := c.do(key, func() (any, error) { return i, nil }); err != nil {
+			t.Fatalf("do: %v", err)
+		}
+	}
+	if got := c.stats().Entries; got != 5 {
+		t.Fatalf("entries = %d, want 5", got)
+	}
+
+	time.Sleep(15 * time.Millisecond) // everything above expires
+
+	// next write sweeps the expired entries
+	if _, _, err := c.do("fresh", func() (any, error) { return "v", nil }); err != nil {
+		t.Fatalf("do: %v", err)
+	}
+	if got := c.stats().Entries; got != 1 {
+		t.Fatalf("entries after sweep = %d, want 1 (expired swept on write)", got)
+	}
+}
+
+func TestCacheHardCap(t *testing.T) {
+	c := newCache(time.Hour) // nothing expires — the cap must still hold
+	for i := range maxCacheEntries + 20 {
+		key := fmt.Sprintf("k%d", i)
+		if _, _, err := c.do(key, func() (any, error) { return i, nil }); err != nil {
+			t.Fatalf("do: %v", err)
+		}
+	}
+	if got := c.stats().Entries; got > maxCacheEntries {
+		t.Fatalf("entries = %d, want ≤ %d", got, maxCacheEntries)
 	}
 }

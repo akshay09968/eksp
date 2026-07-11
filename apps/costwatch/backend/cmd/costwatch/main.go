@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -51,7 +52,15 @@ func main() {
 		client = costexplorer.NewFromConfig(cfg)
 	}
 
-	svc := costs.NewService(client, costs.WithTTL(ttl))
+	// groupBy=TAG:<key> is a billed query per distinct key — closed unless
+	// specific cost-allocation tags are permitted (AUDIT P0-1).
+	var opts []costs.Option
+	opts = append(opts, costs.WithTTL(ttl))
+	if v := os.Getenv("ALLOWED_TAG_KEYS"); v != "" {
+		opts = append(opts, costs.WithAllowedTagKeys(strings.Split(v, ",")))
+	}
+
+	svc := costs.NewService(client, opts...)
 	server := api.New(svc, demo, web.FS())
 
 	port := os.Getenv("PORT")

@@ -18,9 +18,10 @@ import (
 const maxGroups = 12
 
 type Service struct {
-	api   CostExplorerAPI
-	cache *cache
-	now   func() time.Time
+	api         CostExplorerAPI
+	cache       *cache
+	now         func() time.Time
+	allowedTags map[string]bool
 }
 
 type Option func(*Service)
@@ -28,6 +29,21 @@ type Option func(*Service)
 // WithTTL sets the cache TTL; 0 disables caching (used by tests/demo checks).
 func WithTTL(d time.Duration) Option {
 	return func(s *Service) { s.cache = newCache(d) }
+}
+
+// WithAllowedTagKeys permits specific cost-allocation tag keys for
+// groupBy=TAG:<key>. Default is none: every distinct tag key is a *billed* CE
+// query and a long-lived cache entry, so the surface is closed until opened
+// deliberately (AUDIT P0-1).
+func WithAllowedTagKeys(keys []string) Option {
+	return func(s *Service) {
+		s.allowedTags = make(map[string]bool, len(keys))
+		for _, k := range keys {
+			if k = strings.TrimSpace(k); k != "" {
+				s.allowedTags[k] = true
+			}
+		}
+	}
 }
 
 // WithNow pins the clock — Summary math is date-window arithmetic and must be
@@ -55,7 +71,7 @@ func (s *Service) CacheStats() CacheStats { return s.cache.stats() }
 // ---------------------------------------------------------------------------
 
 func (s *Service) Costs(ctx context.Context, q Query) (Series, error) {
-	if err := q.normalize(); err != nil {
+	if err := q.normalize(s.allowedTags); err != nil {
 		return Series{}, err
 	}
 
@@ -71,14 +87,18 @@ func (s *Service) Costs(ctx context.Context, q Query) (Series, error) {
 	return series, nil
 }
 
-func (q *Query) normalize() error {
+func (q *Query) normalize(allowedTags map[string]bool) error {
 	switch q.Granularity {
 	case Hourly, Daily, Monthly:
 	default:
 		return fmt.Errorf("unsupported granularity %q (HOURLY|DAILY|MONTHLY)", q.Granularity)
 	}
 
-	if !ValidGroupBys[q.GroupBy] && !strings.HasPrefix(q.GroupBy, "TAG:") {
+	if tag, ok := strings.CutPrefix(q.GroupBy, "TAG:"); ok {
+		if !allowedTags[tag] {
+			return fmt.Errorf("unsupported groupBy tag key %q — set ALLOWED_TAG_KEYS to permit specific cost-allocation tags", tag)
+		}
+	} else if !ValidGroupBys[q.GroupBy] {
 		return fmt.Errorf("unsupported groupBy %q", q.GroupBy)
 	}
 

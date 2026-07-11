@@ -1,0 +1,29 @@
+name: load-lint
+
+# k6 scripts were previously validated only at load-test time (AUDIT coverage
+# gap). `k6 inspect` parses each scenario without generating load.
+on:
+  pull_request:
+    paths: ["load/**", ".github/workflows/load-lint.yml"]
+  push:
+    branches: [main]
+    paths: ["load/**"]
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: k6 inspect every scenario
+        run: |
+          for f in smoke ramp spike soak; do
+            echo "== $f.js"
+            # renovate: datasource=docker depName=grafana/k6
+            docker run --rm -v "$PWD/load/k6:/scripts:ro" grafana/k6:1.1.0 \
+              inspect "/scripts/${f}.js" >/dev/null
+          done
+          echo "all scenarios parse"

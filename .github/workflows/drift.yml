@@ -20,7 +20,11 @@ concurrency:
 jobs:
   detect:
     name: drift (${{ matrix.env }})
-    if: vars.AWS_PLAN_ROLE_ARN != ''
+    # Public repos: drift issues + job logs would publish infra internals —
+    # operate from a private fork or set the override consciously (AUDIT P0-2).
+    if: >-
+      vars.AWS_PLAN_ROLE_ARN != '' &&
+      (github.event.repository.private || vars.ALLOW_PUBLIC_PLAN_OUTPUT == 'true')
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
