@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"math"
+	"sort"
 	"strconv"
 	"time"
 
@@ -46,9 +47,9 @@ func demoKeys(groupBy string) map[string]float64 {
 		return map[string]float64{"123456789012": 95.0}
 	case "USAGE_TYPE":
 		return map[string]float64{
-			"APS3-BoxUsage:m7g.large":    22.0, "APS3-SpotUsage:c7g.xlarge": 14.0,
-			"APS3-NatGateway-Hours":      3.2, "APS3-DataTransfer-Out-Bytes": 6.1,
-			"APS3-TimedStorage-ByteHrs":  4.3, "APS3-LoadBalancerUsage": 5.6,
+			"APS3-BoxUsage:m7g.large": 22.0, "APS3-SpotUsage:c7g.xlarge": 14.0,
+			"APS3-NatGateway-Hours": 3.2, "APS3-DataTransfer-Out-Bytes": 6.1,
+			"APS3-TimedStorage-ByteHrs": 4.3, "APS3-LoadBalancerUsage": 5.6,
 		}
 	case "RESOURCE_ID":
 		return map[string]float64{
@@ -105,6 +106,16 @@ func (d *DemoClient) GetCostAndUsage(_ context.Context, in *costexplorer.GetCost
 	}
 	keys := demoKeys(groupBy)
 
+	// Emit groups in sorted-key order: map iteration is randomized per process,
+	// and float summation is non-associative — unordered emission made totals
+	// differ in the last ULP between runs, breaking the determinism promise
+	// (caught by TestDemoModeIsDeterministic under repeated runs).
+	names := make([]string, 0, len(keys))
+	for k := range keys {
+		names = append(names, k)
+	}
+	sort.Strings(names)
+
 	var results []cetypes.ResultByTime
 	emit := func(pStart, pEnd time.Time, scale float64) {
 		r := cetypes.ResultByTime{
@@ -113,7 +124,8 @@ func (d *DemoClient) GetCostAndUsage(_ context.Context, in *costexplorer.GetCost
 				End:   aws.String(pEnd.Format(layout)),
 			},
 		}
-		for key, base := range keys {
+		for _, key := range names {
+			base := keys[key]
 			amount := base * scale * wave(key, pStart)
 			if in.Granularity == cetypes.GranularityHourly {
 				amount /= 24
@@ -156,9 +168,16 @@ func (d *DemoClient) GetCostForecast(_ context.Context, in *costexplorer.GetCost
 	end, _ := parseDemoTime(*in.TimePeriod.End)
 	days := end.Sub(start).Hours() / 24
 
+	// Sorted iteration for the same ULP-determinism reason as GetCostAndUsage.
+	names := make([]string, 0, len(demoServices))
+	for k := range demoServices {
+		names = append(names, k)
+	}
+	sort.Strings(names)
+
 	var daily float64
-	for key, base := range demoServices {
-		daily += base * wave(key, start)
+	for _, key := range names {
+		daily += demoServices[key] * wave(key, start)
 	}
 
 	return &costexplorer.GetCostForecastOutput{
