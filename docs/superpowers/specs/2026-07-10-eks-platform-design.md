@@ -392,11 +392,13 @@ over Cluster Autoscaler · 0004 Terraform/GitOps boundary · 0005 Pod Identity o
 0006 ALB IP-mode ingress · 0007 self-hosted kube-prometheus-stack over AMP/Container
 Insights · 0008 S3 native state locking · 0009 spot-first + Graviton compute strategy ·
 0010 kustomize for apps (helm for third-party charts) · 0011 Istio ambient mesh over
-sidecars/Linkerd/App Mesh(EOL)/Cilium mesh · 0012 stdlib-only sample app · 0013 ArgoCD
-over Flux · 0014 Cost Explorer API first, CUR/Athena as the opt-in deep path ·
-0015 embedded SPA (embed.FS) over separate static hosting · 0016 two-layer drift
-detection: ArgoCD selfHeal (k8s, continuous) + scheduled plan (AWS, nightly) over
-driftctl (deprecated) / commercial platforms.
+sidecars/Linkerd/App Mesh(EOL)/Cilium mesh · 0012 no CPU limits (memory limits only) ·
+0013 ArgoCD over Flux · 0014 Cost Explorer API first, CUR/Athena as the opt-in deep
+path · 0015 embedded SPA (embed.FS) over separate static hosting · 0016 two-layer
+drift detection: ArgoCD selfHeal (k8s, continuous) + scheduled plan (AWS, nightly)
+over driftctl (deprecated) / commercial platforms · 0017 API gateway strategy:
+in-mesh Istio gateway over Amazon API Gateway (cost math) · 0018 stdlib-only
+sample app.
 
 ## 14. Open items deferred to roadmap (documented, not built)
 
