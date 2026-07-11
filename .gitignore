@@ -22,8 +22,10 @@ coverage.out
 node_modules/
 apps/costwatch/frontend/dist/
 
-# costwatch: embedded SPA build output (placeholder is committed, build overwrites)
-apps/costwatch/backend/web/dist/assets/
+# costwatch: embedded SPA build output — rebuilt by `make frontend-build`; the
+# backend serves an in-code hint page when dist is empty (fresh clone still builds)
+apps/costwatch/backend/web/dist/*
+!apps/costwatch/backend/web/dist/.gitkeep
 
 # Editors / OS
 .DS_Store

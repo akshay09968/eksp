@@ -264,9 +264,11 @@ beautiful, intuitive web UI. Runs on the platform it monitors.
 - IAM: dedicated Pod Identity role scoped to the `ce:Get*`/`ce:List*` read actions
   (+ Athena/S3/Glue read when the CUR flag is on). No mutating permissions, ever.
 
-**Frontend** (`apps/costwatch/frontend`): React + Vite + TypeScript + Tailwind +
-Recharts, built to the dataviz design system, **embedded into the Go binary via
-`embed.FS`** — one container, no separate static hosting (ADR-0015). Views:
+**Frontend** (`apps/costwatch/frontend`): React + Vite + TypeScript + Recharts +
+a hand-rolled CSS token system (chosen over Tailwind: the "precision ledger"
+aesthetic is bespoke CSS either way, and it drops a build dependency), built to
+the dataviz design system, **embedded into the Go binary via `embed.FS`** — one
+container, no separate static hosting (ADR-0015). Views:
 - **Overview**: KPI tiles (MTD spend, forecasted month-end, Δ vs last month, top
   mover), spend trend area chart, service breakdown donut, anomalies strip
   (largest day-over-day movers).
