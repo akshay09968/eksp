@@ -1,0 +1,117 @@
+name: drift
+
+# Layer 2 of the drift model (ADR-0016): ArgoCD continuously reconciles the
+# Kubernetes layer (selfHeal+prune); this workflow watches the AWS layer by
+# planning nightly with the read-only role. Exit code 2 = live infra diverged
+# from state/config → open or update a `drift`-labeled issue; exit 0 closes it.
+on:
+  schedule:
+    - cron: "17 21 * * *" # 03:17 IST, nightly
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  id-token: write
+  issues: write
+
+concurrency:
+  group: drift
+
+jobs:
+  detect:
+    name: drift (${{ matrix.env }})
+    if: vars.AWS_PLAN_ROLE_ARN != ''
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 1 # issues update sequentially — no comment races
+      matrix:
+        env: [dev, staging, prod]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_PLAN_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || 'ap-south-1' }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.14.1"
+
+      - name: init (S3 backend)
+        env:
+          DRIFT_ENV: ${{ matrix.env }}
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          terraform -chdir="terraform/envs/${DRIFT_ENV}" init -input=false \
+            -backend-config="bucket=eksp-tfstate-${ACCOUNT_ID}" \
+            -backend-config="key=envs/${DRIFT_ENV}/terraform.tfstate" \
+            -backend-config="region=${{ vars.AWS_REGION || 'ap-south-1' }}" \
+            -backend-config="use_lockfile=true"
+
+      - name: plan with detailed exit code
+        id: plan
+        env:
+          DRIFT_ENV: ${{ matrix.env }}
+        run: |
+          set +e
+          terraform -chdir="terraform/envs/${DRIFT_ENV}" plan -input=false -lock=false \
+            -detailed-exitcode -no-color 2>&1 | tail -c 60000 > plan.txt
+          code=${PIPESTATUS[0]}
+          set -e
+          # 0 = clean, 2 = drift, 1 = error (fail the job so it's visible)
+          if [ "$code" = "1" ]; then cat plan.txt; exit 1; fi
+          echo "exitcode=$code" >> "$GITHUB_OUTPUT"
+
+      # Plan text is filesystem-passed, never expression-interpolated.
+      - name: open/update or close the drift issue
+        uses: actions/github-script@v7
+        env:
+          DRIFT_ENV: ${{ matrix.env }}
+          EXITCODE: ${{ steps.plan.outputs.exitcode }}
+        with:
+          script: |
+            const fs = require('fs');
+            const env = process.env.DRIFT_ENV;
+            const drifted = process.env.EXITCODE === '2';
+            const title = `drift: ${env} has diverged from Terraform state`;
+
+            const { data: issues } = await github.rest.issues.listForRepo({
+              ...context.repo, state: 'open', labels: 'drift',
+            });
+            const existing = issues.find(i => i.title === title);
+
+            if (!drifted) {
+              if (existing) {
+                await github.rest.issues.createComment({
+                  ...context.repo, issue_number: existing.number,
+                  body: 'Nightly plan is clean again — closing.',
+                });
+                await github.rest.issues.update({
+                  ...context.repo, issue_number: existing.number, state: 'closed',
+                });
+              }
+              return;
+            }
+
+            const plan = fs.readFileSync('plan.txt', 'utf8');
+            const fence = '`'.repeat(3);
+            const body = [
+              `Nightly \`terraform plan\` for **${env}** found changes — someone or something`,
+              'modified AWS outside Terraform (or a PR applied partially).',
+              '',
+              'Runbook: docs/RUNBOOK.md#drift',
+              '',
+              fence, plan, fence,
+            ].join('\n');
+
+            if (existing) {
+              await github.rest.issues.createComment({
+                ...context.repo, issue_number: existing.number, body,
+              });
+            } else {
+              await github.rest.issues.create({
+                ...context.repo, title, body, labels: ['drift', env],
+              });
+            }

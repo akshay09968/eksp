@@ -1,0 +1,132 @@
+name: terraform
+
+on:
+  pull_request:
+    paths: ["terraform/**", ".github/workflows/terraform.yml"]
+  push:
+    branches: [main]
+    paths: ["terraform/**"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: terraform-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TF_VERSION: "1.14.1"
+
+jobs:
+  static:
+    name: fmt · validate · tflint · test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: terraform fmt
+        run: terraform fmt -check -recursive terraform/
+
+      - name: validate all roots
+        run: |
+          for d in terraform/bootstrap terraform/envs/dev terraform/envs/staging terraform/envs/prod; do
+            echo "== $d"
+            terraform -chdir="$d" init -backend=false -input=false >/dev/null
+            terraform -chdir="$d" validate
+          done
+
+      - name: terraform test (mocked, offline)
+        run: |
+          terraform -chdir=terraform/modules/network init -backend=false -input=false >/dev/null
+          terraform -chdir=terraform/modules/network test
+
+      - uses: terraform-linters/setup-tflint@v4
+
+      - name: tflint
+        run: tflint --recursive --format compact
+
+      - name: helm lint (karpenter-resources chart)
+        run: helm lint terraform/charts/karpenter-resources
+
+  checkov:
+    name: checkov security scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: terraform
+          quiet: true
+          framework: terraform
+          # Documented accepted findings only — keep this list short and honest.
+          # CKV_AWS_39/38: public EKS endpoint is a deliberate, variable-gated
+          # portfolio trade-off (prod refuses 0.0.0.0/0 via validation).
+          skip_check: CKV_AWS_39,CKV_AWS_38
+
+  plan:
+    name: plan (${{ matrix.env }})
+    # Same-repo PRs only (fork PRs get no OIDC token), and only when the repo
+    # has the role configured; forks/fresh clones skip cleanly instead of failing.
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      vars.AWS_PLAN_ROLE_ARN != ''
+    needs: [static]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    strategy:
+      fail-fast: false
+      matrix:
+        env: [dev, staging, prod]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_PLAN_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || 'ap-south-1' }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: init (S3 backend)
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          terraform -chdir=terraform/envs/${{ matrix.env }} init -input=false \
+            -backend-config="bucket=eksp-tfstate-${ACCOUNT_ID}" \
+            -backend-config="key=envs/${{ matrix.env }}/terraform.tfstate" \
+            -backend-config="region=${{ vars.AWS_REGION || 'ap-south-1' }}" \
+            -backend-config="use_lockfile=true"
+
+      - name: plan
+        run: |
+          terraform -chdir=terraform/envs/${{ matrix.env }} plan -input=false -lock=false -no-color 2>&1 \
+            | tail -c 60000 > plan.txt
+
+      # Plan text is PR-influenced input: it reaches the comment via the
+      # filesystem + JS string building, never workflow-expression interpolation
+      # (GitHub Actions injection guidance).
+      - name: comment plan on PR
+        uses: actions/github-script@v7
+        env:
+          PLAN_ENV: ${{ matrix.env }}
+        with:
+          script: |
+            const fs = require('fs');
+            const plan = fs.readFileSync('plan.txt', 'utf8');
+            const fence = '`'.repeat(3);
+            const body = ['### terraform plan — ' + process.env.PLAN_ENV, fence, plan, fence].join('\n');
+            await github.rest.issues.createComment({
+              ...context.repo,
+              issue_number: context.issue.number,
+              body,
+            });

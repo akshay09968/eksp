@@ -1,0 +1,57 @@
+name: terraform-apply
+
+# Applies are explicit: manual dispatch with an environment picker. Each GitHub
+# environment (dev/staging/prod) carries its own protection rules — require
+# reviewers on prod, and the OIDC trust in terraform/bootstrap already scopes
+# the role to main + environments.
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: environment to apply
+        type: choice
+        required: true
+        options: [dev, staging, prod]
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: apply-${{ inputs.environment }}
+
+jobs:
+  apply:
+    name: apply (${{ inputs.environment }})
+    if: vars.AWS_APPLY_ROLE_ARN != ''
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_APPLY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || 'ap-south-1' }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.14.1"
+
+      - name: init (S3 backend)
+        env:
+          APPLY_ENV: ${{ inputs.environment }}
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          terraform -chdir="terraform/envs/${APPLY_ENV}" init -input=false \
+            -backend-config="bucket=eksp-tfstate-${ACCOUNT_ID}" \
+            -backend-config="key=envs/${APPLY_ENV}/terraform.tfstate" \
+            -backend-config="region=${{ vars.AWS_REGION || 'ap-south-1' }}" \
+            -backend-config="use_lockfile=true"
+
+      - name: plan → apply
+        env:
+          APPLY_ENV: ${{ inputs.environment }}
+        run: |
+          terraform -chdir="terraform/envs/${APPLY_ENV}" plan -input=false -out=tfplan
+          terraform -chdir="terraform/envs/${APPLY_ENV}" apply -input=false tfplan
