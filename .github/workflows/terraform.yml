@@ -28,6 +28,18 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
+      # Providers are ~500MB across the roots; cache them keyed on lockfiles.
+      - name: cache terraform providers
+        uses: actions/cache@v4
+        with:
+          path: ~/.terraform.d/plugin-cache
+          key: tfproviders-${{ runner.os }}-${{ hashFiles('**/.terraform.lock.hcl') }}
+
+      - name: enable provider plugin cache
+        run: |
+          mkdir -p ~/.terraform.d/plugin-cache
+          echo 'plugin_cache_dir = "~/.terraform.d/plugin-cache"' > ~/.terraformrc
+
       - name: terraform fmt
         run: terraform fmt -check -recursive terraform/
 

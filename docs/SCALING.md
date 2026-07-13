@@ -83,6 +83,41 @@ target 800): request rate moves seconds before CPU does. Scale-up policy: +100%
 or +8 pods per 15 s, no stabilization; scale-down waits 5 min. Fast readiness
 (2 s initial, 5 s period) puts new pods in service quickly.
 
+### The spike, end to end
+
+What actually happens in the first two minutes of a 3× step — the HPA and
+Karpenter loops compose, they don't coordinate:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant LB as NLB/gateway
+    participant P as prometheus + adapter
+    participant HPA as HPA controller<br/>(15s loop)
+    participant D as Deployment/RS
+    participant S as scheduler
+    participant K as Karpenter
+    participant EC2 as EC2 (spot)
+
+    Note over LB: t=0 — traffic steps 17k → 50k RPS
+    LB->>P: http_requests_total climbs (scrape ≤15s)
+    P->>HPA: http_requests_per_second ≈ 2300/pod (target 800)
+    HPA->>D: scale 22 → 64 replicas (policy: +100%/15s, no stabilization)
+    D->>S: 42 new pods
+    S-->>S: ~12 fit existing headroom → Running in seconds
+    S->>K: ~30 pods Pending (unschedulable)
+    K->>EC2: batch bin-pack → NodeClaims across c/m/r gen5+,<br/>price-capacity-optimized spot
+    EC2-->>K: instances up (~40s)
+    K-->>S: nodes Ready (~60–90s total: boot + join + CNI)
+    S->>D: remaining pods scheduled, readiness in 2s
+    Note over LB: t≈2min — p99 recovered; existing pods<br/>(no CPU limits) absorbed the interim burst
+```
+
+The "no CPU limits" decision (ADR-0012) is load-bearing here: during the
+60–90s node-provisioning window, the original 22 pods burst far past their
+requests on idle node CPU instead of being throttled at exactly the wrong
+moment.
+
 ### Conntrack
 
 Every NAT'd/tracked flow occupies a conntrack slot; EC2's default established
@@ -117,6 +152,30 @@ old pod gets SIGTERM → **app fails `/readyz` but keeps serving 15 s**
 (30 s) stops new sends while in-flight requests finish →
 `terminationGracePeriodSeconds: 45` outlasts all of it. PDB (10% prod) gates
 node drains; topology spread keeps any single AZ/host loss ≤ a third of capacity.
+
+One old pod's death, on a timeline — the point is that traffic stops *before*
+serving stops, and serving stops *before* the kill switch:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant K as kubelet
+    participant App as old pod (app)
+    participant EP as endpoints/ztunnel
+    participant LB as LB target group
+
+    Note over K: surge pod already Ready<br/>(maxUnavailable: 0)
+    K->>App: SIGTERM (t=0)
+    App->>App: readyz → 503, keeps serving
+    EP->>EP: readiness fails (≤10s: 5s probe × 2) → endpoint removed
+    LB->>LB: deregistration starts — no NEW requests,<br/>in-flight allowed 30s (t≈0–30)
+    Note over App: t=15 — drain delay elapsed,<br/>server.Shutdown waits for in-flight
+    App-->>K: exits clean (typically t≈16–20)
+    Note over K: SIGKILL only at t=45<br/>(terminationGracePeriodSeconds) — never reached<br/>unless a request ran >25s
+```
+
+Every 5xx-free deploy at high RPS is these four clocks agreeing:
+probe (10s) < drain delay (15s) < deregistration (30s) < grace (45s).
 
 ### Control plane
 

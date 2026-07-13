@@ -9,6 +9,38 @@ Terraform  ──creates──►  AWS + cluster-critical software   (slow-chang
 ArgoCD     ──syncs────►  everything else in-cluster        (fast-changing, git-driven)
 ```
 
+Both planes are reconciliation loops with different clocks, and both watch for
+drift (ADR-0016):
+
+```mermaid
+flowchart TB
+    subgraph git ["git (source of truth)"]
+        TF[terraform/]
+        GO[gitops/]
+    end
+
+    subgraph slow ["Terraform plane — human-triggered"]
+        PLAN[plan on PR] --> APPLY[gated apply]
+        DRIFT["nightly plan -detailed-exitcode"]
+    end
+
+    subgraph fast ["ArgoCD plane — continuous (~3 min)"]
+        SYNC[sync + selfHeal + prune]
+    end
+
+    TF --> PLAN
+    APPLY --> AWS[("AWS: VPC, EKS, IAM,<br/>Karpenter, ALB ctrl, ArgoCD")]
+    GO --> SYNC --> K8S[("cluster objects:<br/>platform, mesh,<br/>observability, apps")]
+
+    AWS -. diverged? .-> DRIFT
+    DRIFT -- exit 2 --> ISSUE[GitHub issue opened]
+    K8S -. manual kubectl edit .-> SYNC
+```
+
+Left loop: changes flow only through reviewed plans; divergence becomes a
+tracked issue. Right loop: divergence is *reverted automatically* — a manual
+`kubectl edit` survives about three minutes.
+
 **The boundary rule ([ADR-0004](adr/0004-terraform-gitops-boundary.md)):** if it
 needs an AWS IAM role or must exist before workloads can schedule, Terraform
 owns it (VPC, EKS, Karpenter, ALB controller, EBS CSI, ArgoCD itself + the root
@@ -31,11 +63,40 @@ client → (Route53/CloudFront/WAF: documented edge, not provisioned)
                              ──mTLS + waypoint (retry/timeout/authz)──► sample-worker
 ```
 
+The staging/prod path in full — every hop where identity or policy is
+enforced:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as client
+    participant NLB as NLB (L4, ip targets)
+    participant GW as istio ingress gateway<br/>(Envoy, in-mesh)
+    participant ZA as ztunnel @ api node<br/>(L4 mTLS)
+    participant API as sample-api pod
+    participant WP as waypoint<br/>(L7 policy for apps ns)
+    participant ZW as ztunnel @ worker node
+    participant W as sample-worker pod
+
+    C->>NLB: HTTP :80 (TLS: issue #1)
+    NLB->>GW: forward to gateway pod IP
+    Note over GW: HTTPRoute sample-api-external<br/>10s timeout, routing
+    GW->>ZA: HBONE tunnel :15008 (mTLS, SPIFFE identity)
+    ZA->>API: plaintext on loopback-equivalent
+    API->>WP: GET worker /work (via Service)
+    Note over WP: AuthorizationPolicy: only<br/>sa/sample-api may call worker.<br/>HTTPRoute: 2s timeout, 1 retry
+    WP->>ZW: HBONE mTLS
+    ZW->>W: deliver
+    W-->>C: response (reverse path)
+```
+
 Why the split ([ADR-0017](adr/0017-api-gateway-strategy.md)): with STRICT
 ambient mTLS, an out-of-mesh ALB targeting pods directly is *rejected* — north-
 south must enter through an in-mesh gateway. Dev keeps the plain ALB so both
 patterns are on display; the gateway is also where API-gateway-tier policy
-(JWT, rate limits) attaches later without touching apps.
+(JWT, rate limits) attaches later without touching apps. NetworkPolicy (L3/4,
+pod selectors) and AuthorizationPolicy (L7, cryptographic identity) are
+*independent* gates — both must pass.
 
 ## Network design
 

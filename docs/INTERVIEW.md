@@ -33,7 +33,55 @@ Then stop talking and let them pick a thread. Every thread has depth.
 5. **Observability rail**: metrics → adapter → HPA (the "scale on RPS, not
    CPU" arrow) and → burn-rate alerts → runbook anchors.
 
-Practice until the drawing takes four minutes.
+This is the target drawing — practice until reproducing it on a whiteboard
+takes four minutes:
+
+```mermaid
+flowchart LR
+    C((client)) --> NLB
+
+    subgraph VPC ["VPC /16 · 3 AZ"]
+        subgraph PUB ["public /22 per AZ"]
+            NLB[NLB]
+            NAT[NAT ×3]
+        end
+        subgraph PRIV ["private /18 per AZ — prefix delegation"]
+            subgraph SYS ["system MNG (tainted, Graviton)"]
+                CORE[CoreDNS]
+                KARP[Karpenter]
+                ARGO[ArgoCD]
+                ISTD[istiod]
+            end
+            subgraph FLEET ["Karpenter fleet: spot w100 / on-demand w10"]
+                GW[istio gateway] -->|HBONE mTLS| API[api ×HPA]
+                API -->|mTLS + waypoint| WRK[worker ×HPA]
+                CW[costwatch]
+                PROM[prometheus + adapter]
+            end
+        end
+        subgraph INTRA ["intra /24 per AZ"]
+            CP[EKS control-plane ENIs]
+        end
+    end
+
+    NLB --> GW
+    PROM -->|http_requests_per_second| API
+    KARP -.provisions.-> FLEET
+    CW -->|Pod Identity, read-only| CE[(Cost Explorer)]
+
+    TFPLANE[Terraform plane] -.owns.-> VPC
+    GITPLANE[ArgoCD plane] -.owns.-> FLEET
+```
+
+## The diagrams (rendered on GitHub — walk them, don't memorize them)
+
+| Diagram | Where | Use it for |
+|---|---|---|
+| Two control loops + drift | [ARCHITECTURE.md](ARCHITECTURE.md#the-two-plane-model) | "how do you manage drift?" |
+| Request path, hop by hop | [ARCHITECTURE.md](ARCHITECTURE.md#request-path) | "walk me through a request" |
+| Spike response (HPA × Karpenter) | [SCALING.md](SCALING.md#the-spike-end-to-end) | "what happens when traffic triples?" |
+| Zero-error deploy timeline | [SCALING.md](SCALING.md#deploys-at-full-load) | "how do you deploy without 5xx?" |
+| Platform overview | [README](../README.md#architecture) | the 30-second orientation |
 
 ## Per-layer talking points (build → rejected alternative)
 
@@ -77,6 +125,76 @@ Practice until the drawing takes four minutes.
   feature ($0.01/call); EKS split cost allocation for pod-level showback as
   the roadmap. And the honest macro point from COST.md: **at this volume,
   egress dominates, not the cluster** — that's why the edge tier matters.
+
+## Kubernetes fundamentals — answered with this repo
+
+Staff loops always probe fundamentals. Generic textbook answers are table
+stakes; anchoring each one in something you *built* is what lands. Every
+answer below ends in a file you can open.
+
+**"Walk me through what happens when a request hits your cluster."**
+Trace the [request-path diagram](ARCHITECTURE.md#request-path) hop by hop:
+NLB (L4, ip targets — no NodePort hop, ADR-0006) → gateway Envoy (HTTPRoute:
+routing + timeout) → ztunnel HBONE tunnel (mTLS, SPIFFE identity per
+ServiceAccount) → pod. East-west adds the waypoint (authz + retry policy).
+Close with: "two independent gates — NetworkPolicy at L3/4 by pod selector,
+AuthorizationPolicy at L7 by cryptographic identity."
+
+**"What happens when you create a pod / how does scheduling work?"**
+API server persists the Deployment → ReplicaSet controller creates Pods →
+scheduler filters (taints: my system MNG repels workloads; requests: why every
+container sets them) and scores (my topologySpreadConstraints spread across
+zones/hosts) → no node fits? Pod goes Pending — and *that's Karpenter's input*:
+it bin-packs pending pods against the EC2 catalog and creates NodeClaims
+([spike diagram](SCALING.md#the-spike-end-to-end)). Kubelet pulls (through the
+ECR VPC endpoint in prod), CNI assigns an IP from a delegated /28 prefix,
+probes gate readiness, endpoints propagate.
+
+**"How does Service networking actually work?"**
+ClusterIP is iptables DNAT programmed by kube-proxy from EndpointSlices — fine
+at my service count; IPVS/eBPF is the >5k-services conversation. But note both
+my ingress paths *bypass* it deliberately: the LB targets pod IPs directly
+(`ip` mode), and in the mesh, ztunnel routes to backends itself. kube-proxy
+mostly serves in-cluster ClusterIP traffic like costwatch's scrapes.
+
+**"How does DNS resolution work in a pod, and how does it fail?"**
+resolv.conf points at the kube-dns ClusterIP with `ndots:5` + search paths —
+an unqualified name fans out to ~5 queries, UDP, through conntrack, cross-node.
+At high RPS that's the classic first casualty. My three defenses, in
+`gitops/platform/`: CoreDNS floors + zone spread, **NodeLocal DNSCache** in
+prod (link-local cache + NOTRACK interception of the kube-dns IP — kills the
+conntrack entry *and* the cross-node hop), and FQDN-with-trailing-context URLs
+in app config to skip the search path.
+
+**"Requests vs limits? What would you set?"**
+Requests are the scheduling contract (bin-packing truth, HPA denominator,
+CFS *shares* under contention). Memory limits yes — memory is incompressible,
+OOM beats node-level chaos. **CPU limits no** (ADR-0012): CFS quota throttles
+in 100ms windows and adds tail latency exactly at peak. Then the kicker: "the
+spike diagram shows why — during Karpenter's 60–90s provisioning window, the
+original pods absorb the burst on idle node CPU *because* they're unthrottled."
+
+**"How do you take a node out of service safely?"**
+Cordon → drain respects PDBs (mine: absolute `1` in dev — a percentage of 2
+replicas rounds to 0 and blocks every drain, a real gotcha — 10% in prod) →
+each evicted pod runs the full [termination choreography](SCALING.md#deploys-at-full-load).
+Karpenter does exactly this on spot interruption: SQS 2-minute warning →
+taint, drain, replace. The RUNBOOK has the drill.
+
+**"What's a controller / reconciliation loop?"** — the theme of the whole
+repo: HPA (desired replicas from metrics), Karpenter (desired capacity from
+pending pods), ArgoCD (desired cluster from git), Terraform (desired AWS from
+HCL, human-clocked), even the drift workflow (desired = state file). Same
+shape everywhere: observe → diff → act. Point at the
+[two-plane diagram](ARCHITECTURE.md#the-two-plane-model).
+
+**"How does the HPA actually compute replicas?"**
+`desired = ceil(current × metric/target)` per metric, take the max across
+metrics. Mine runs two: CPU-utilization-of-*request* and
+`http_requests_per_second` via prometheus-adapter (custom.metrics API) —
+because request rate moves seconds before CPU. Scale-up policy is aggressive
+(+100% or +8 pods / 15s, no stabilization), scale-down waits 5 minutes —
+asymmetric on purpose: under-capacity costs users, over-capacity costs cents.
 
 ## Questions they'll ask, and strong answers
 

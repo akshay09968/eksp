@@ -22,14 +22,14 @@ flowchart LR
     end
 
     subgraph aws ["AWS · ap-south-1 · VPC /16 · 3 AZ"]
-        LB["dev: ALB (Ingress)\nstaging/prod: NLB → Istio ingress gateway"]
+        LB["dev: ALB (Ingress)<br/>staging/prod: NLB → Istio ingress gateway"]
         subgraph eks ["EKS 1.33 (access entries, KMS, Pod Identity)"]
             GW[istio ingress gateway] -->|HBONE mTLS| API[sample-api ×HPA]
             API -->|mTLS + waypoint policy| WRK[sample-worker ×HPA]
             CW[costwatch UI+API]
             OBS[Prometheus · Grafana · adapter]
             ARGO[ArgoCD app-of-apps]
-            KARP[Karpenter: spot-first NodePools\n+ on-demand fallback]
+            KARP["Karpenter: spot-first NodePools<br/>+ on-demand fallback"]
             SYS["system MNG (Graviton, tainted)"]
         end
         CE[(Cost Explorer API)]

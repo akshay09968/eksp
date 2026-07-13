@@ -36,12 +36,17 @@ lint: ## tflint across all Terraform
 	tflint --recursive
 
 .PHONY: validate
-validate: ## terraform validate every root (offline)
+validate: ## terraform validate every root (offline; skips init when providers are cached)
 	@for d in $(TF_ROOTS); do \
 		echo "== $$d"; \
-		terraform -chdir=$$d init -backend=false -input=false >/dev/null; \
+		[ -d $$d/.terraform ] || terraform -chdir=$$d init -backend=false -input=false >/dev/null; \
 		terraform -chdir=$$d validate || exit 1; \
 	done
+
+.PHONY: validate-fresh
+validate-fresh: ## validate with forced re-init (after provider/module version bumps)
+	@for d in $(TF_ROOTS); do rm -rf $$d/.terraform; done
+	@$(MAKE) validate
 
 .PHONY: tf-test
 tf-test: ## Run terraform native tests (mocked, offline) for every module with tests
