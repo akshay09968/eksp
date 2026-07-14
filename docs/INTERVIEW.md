@@ -73,6 +73,14 @@ flowchart LR
     GITPLANE[ArgoCD plane] -.owns.-> FLEET
 ```
 
+**Practice with the editable version:** open
+[`diagrams/eksp-whiteboard.excalidraw`](../diagrams/eksp-whiteboard.excalidraw)
+at [excalidraw.com](https://excalidraw.com) (File → Open) — movable
+hand-drawn-style boxes you can redraw from memory, annotate with failure
+points, or screen-share in a virtual interview.
+([`eksp-control-loops.excalidraw`](../diagrams/eksp-control-loops.excalidraw)
+exists too; PNG/SVG renders sit alongside in [`diagrams/`](../diagrams/).)
+
 ## The diagrams (rendered on GitHub — walk them, don't memorize them)
 
 | Diagram | Where | Use it for |
