@@ -110,7 +110,7 @@ sequenceDiagram
     EC2-->>K: instances up (~40s)
     K-->>S: nodes Ready (~60–90s total: boot + join + CNI)
     S->>D: remaining pods scheduled, readiness in 2s
-    Note over LB: t≈2min — p99 recovered; existing pods<br/>(no CPU limits) absorbed the interim burst
+    Note over LB: t≈2min — p99 recovered.<br/>Unthrottled pods absorbed the interim burst
 ```
 
 The "no CPU limits" decision (ADR-0012) is load-bearing here: during the
