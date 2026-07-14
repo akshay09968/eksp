@@ -1,0 +1,34 @@
+graph LR
+    client((client)) --> NLB[NLB]
+
+    subgraph vpc ["VPC /16 · 3 AZ · ap-south-1"]
+        subgraph pub ["public /22 per AZ"]
+            NLB
+            NAT["NAT ×3"]
+        end
+        subgraph sys ["system MNG · tainted Graviton"]
+            CoreDNS[CoreDNS]
+            Karpenter[Karpenter]
+            ArgoCD[ArgoCD]
+            istiod[istiod]
+        end
+        subgraph fleet ["Karpenter fleet · spot w100 / on-demand w10 · private /18"]
+            GW["istio gateway"]
+            API["sample-api ×HPA"]
+            WRK["sample-worker ×HPA"]
+            CW[costwatch]
+            PROM["prometheus + adapter"]
+        end
+        subgraph intra ["intra /24 per AZ"]
+            CP["EKS control-plane ENIs"]
+        end
+    end
+
+    NLB --> GW
+    GW -->|HBONE mTLS| API
+    API -->|mTLS + waypoint policy| WRK
+    PROM -->|http_requests_per_second| API
+    Karpenter -. provisions .-> fleet
+    CW -->|Pod Identity, read-only| CE[("Cost Explorer")]
+    TFPLANE["Terraform plane"] -. owns .-> vpc
+    GITPLANE["ArgoCD plane"] -. owns .-> fleet

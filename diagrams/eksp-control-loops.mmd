@@ -1,0 +1,22 @@
+graph TB
+    subgraph git ["git — source of truth"]
+        TF["terraform/"]
+        GO["gitops/"]
+    end
+
+    subgraph tfp ["Terraform plane"]
+        PLAN["plan on PR (human-triggered)"] --> APPLY["gated apply"]
+        DRIFT["nightly plan -detailed-exitcode"]
+    end
+
+    subgraph argo ["ArgoCD plane"]
+        SYNC["sync + selfHeal + prune (continuous, ~3 min)"]
+    end
+
+    TF --> PLAN
+    APPLY --> AWS["AWS: VPC · EKS · IAM · Karpenter · ALB ctrl"]
+    GO --> SYNC
+    SYNC --> K8S["cluster objects: platform · mesh · observability · apps"]
+    AWS -. diverged? .-> DRIFT
+    DRIFT -->|exit 2| ISSUE["GitHub issue opened"]
+    K8S -. manual kubectl edit .-> SYNC
