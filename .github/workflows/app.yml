@@ -24,10 +24,10 @@ jobs:
         include:
           - app: sample-api
             dir: apps/sample-api
-            coverage_floor: 65
+            coverage_floor: 80
           - app: costwatch
             dir: apps/costwatch/backend
-            coverage_floor: 75
+            coverage_floor: 80
     steps:
       - uses: actions/checkout@v4
 
@@ -101,6 +101,7 @@ jobs:
       - uses: docker/setup-buildx-action@v3
 
       - name: build + push (amd64 + arm64)
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.context }}
@@ -111,6 +112,34 @@ jobs:
           tags: ${{ steps.ecr.outputs.registry }}/eksp/${{ matrix.app }}:v0.1.${{ github.run_number }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # Supply chain gate (COMPLIANCE to-do #3): a HIGH/CRITICAL CVE in the
+      # pushed image blocks the promotion PR — the image exists in ECR but
+      # never reaches an overlay. .trivyignore documents accepted findings.
+      - name: trivy gate (HIGH/CRITICAL block promotion)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ steps.ecr.outputs.registry }}/eksp/${{ matrix.app }}@${{ steps.build.outputs.digest }}
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          ignore-unfixed: true
+
+      - name: install cosign
+        uses: sigstore/cosign-installer@v3
+
+      # Keyless signing: the signature binds this image digest to this exact
+      # workflow identity (repo, ref, run) via the GitHub OIDC token.
+      - name: cosign sign (keyless)
+        env:
+          IMAGE: ${{ steps.ecr.outputs.registry }}/eksp/${{ matrix.app }}@${{ steps.build.outputs.digest }}
+        run: cosign sign --yes "$IMAGE"
+
+      - name: SBOM (spdx) as run artifact
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ steps.ecr.outputs.registry }}/eksp/${{ matrix.app }}@${{ steps.build.outputs.digest }}
+          format: spdx-json
+          artifact-name: sbom-${{ matrix.app }}-v0.1.${{ github.run_number }}.spdx.json
 
       # The deploy IS a git change: bump the dev overlay tag and open a PR.
       # Merging it makes ArgoCD roll dev; staging/prod promote by cherry-pick.

@@ -25,7 +25,27 @@ if ! cmp -s terraform/envs/dev/variables.tf terraform/envs/staging/variables.tf;
   fail=1
 fi
 
+# NodeLocal DNSCache guard (AUDIT P1-9 / issue #3): the prod manifest hardcodes
+# kube-dns ClusterIP 172.20.0.10, which is only true because EKS picks service
+# CIDR 172.20.0.0/16 when the VPC lives in 10.0.0.0/8. A VPC outside 10/8 would
+# silently break DNS interception in prod — fail here instead.
+for env_main in terraform/envs/*/main.tf; do
+  cidr=$(grep -Eo 'vpc_cidr\s*=\s*"[0-9./]+"' "$env_main" | grep -Eo '"[0-9./]+"' | tr -d '"')
+  case "$cidr" in
+    10.*) : ;;
+    "")
+      echo "GUARD: no vpc_cidr literal found in $env_main — update this guard if the shape changed"
+      fail=1
+      ;;
+    *)
+      echo "GUARD: $env_main uses vpc_cidr $cidr (outside 10/8) — EKS will NOT pick 172.20.0.0/16, so gitops/platform/overlays/prod/nodelocal-dns.yaml's hardcoded 172.20.0.10 breaks. Fix the manifest or the CIDR."
+      fail=1
+      ;;
+  esac
+done
+
 if [ "$fail" = 0 ]; then
   echo "env parity: shared files identical (prod variables.tf exception is documented)"
+  echo "nodelocal guard: all env VPCs in 10/8 (172.20.0.10 assumption holds)"
 fi
 exit "$fail"

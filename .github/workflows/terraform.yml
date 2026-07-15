@@ -120,13 +120,10 @@ jobs:
           terraform_version: ${{ env.TF_VERSION }}
 
       - name: init (S3 backend)
-        run: |
-          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          terraform -chdir=terraform/envs/${{ matrix.env }} init -input=false \
-            -backend-config="bucket=eksp-tfstate-${ACCOUNT_ID}" \
-            -backend-config="key=envs/${{ matrix.env }}/terraform.tfstate" \
-            -backend-config="region=${{ vars.AWS_REGION || 'ap-south-1' }}" \
-            -backend-config="use_lockfile=true"
+        uses: ./.github/actions/tf-init
+        with:
+          env: ${{ matrix.env }}
+          region: ${{ vars.AWS_REGION || 'ap-south-1' }}
 
       - name: plan
         run: |

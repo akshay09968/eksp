@@ -54,23 +54,26 @@ module "karpenter" {
   }
 }
 
+# No depends_on: the helm provider is configured from module.eks outputs, so
+# every release in this module already waits for the cluster (AUDIT P1-6 —
+# module-level depends_on only serialized the apply and deferred data sources
+# to apply time). Addons schedule on the system MNG, not Karpenter capacity.
 module "addons" {
   source = "../../modules/addons"
 
   cluster_name = module.eks.cluster_name
   vpc_id       = module.network.vpc_id
   region       = var.region
-
-  depends_on = [module.karpenter]
 }
 
+# No depends_on (AUDIT P1-6): cluster ordering is implicit via the helm
+# provider; ArgoCD needs nothing from addons at install time — apps that
+# create Ingresses simply retry until the ALB controller is Ready.
 module "gitops" {
   source = "../../modules/gitops-bootstrap"
 
   env_name = local.env
   repo_url = var.gitops_repo_url
-
-  depends_on = [module.addons]
 }
 
 # ---------------------------------------------------------------------------

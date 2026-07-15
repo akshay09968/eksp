@@ -40,3 +40,4 @@ kubeconfig*
 
 # k6 outputs
 load/k6/results/
+.gstack/

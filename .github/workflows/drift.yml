@@ -44,15 +44,10 @@ jobs:
           terraform_version: "1.14.1"
 
       - name: init (S3 backend)
-        env:
-          DRIFT_ENV: ${{ matrix.env }}
-        run: |
-          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          terraform -chdir="terraform/envs/${DRIFT_ENV}" init -input=false \
-            -backend-config="bucket=eksp-tfstate-${ACCOUNT_ID}" \
-            -backend-config="key=envs/${DRIFT_ENV}/terraform.tfstate" \
-            -backend-config="region=${{ vars.AWS_REGION || 'ap-south-1' }}" \
-            -backend-config="use_lockfile=true"
+        uses: ./.github/actions/tf-init
+        with:
+          env: ${{ matrix.env }}
+          region: ${{ vars.AWS_REGION || 'ap-south-1' }}
 
       - name: plan with detailed exit code
         id: plan

@@ -26,6 +26,16 @@ audit method (run suites repeatedly, don't trust one green run) earns its cost.
 | Coverage: no CI coverage gate / k6 lint | ✅ floors 65/75% in app CI; `load-lint.yml` parses every scenario |
 | P1-6 `depends_on` plan noise · P1-9 NodeLocal IP assumption · P2 items | ⏳ open, tracked above |
 
+## Remediation log (2026-07-15)
+
+| Finding | Status |
+|---|---|
+| P1-6 module-level `depends_on` (issue #2) | ✅ removed from all envs — cluster ordering is implicit via the helm provider's `module.eks` outputs; rationale inline in each main.tf |
+| P1-9 NodeLocal CIDR assumption (issue #3) | ✅ guarded — `check-env-parity.sh` fails any env VPC outside 10/8; manifest comment points at the guard |
+| Supply chain gate (issue #5) | ✅ publish job: trivy blocks promotion on HIGH/CRITICAL, cosign keyless signing binds digest→workflow identity, SPDX SBOM attached per run |
+| sample-api coverage (issue #7) | ✅ configFromEnv, panic-recovery, and full drain-choreography tests added (drain extracted from main() into `(*app).shutdown` for testability); CI floor raised to match measured coverage |
+| P2-11/12 refactors (issue #8) | ✅ `costs/service.go` split into service/aggregate/summary; the S3-backend init block now lives once in `.github/actions/tf-init` (used by plan, apply, drift) |
+
 ## P0 — fix before operating against a real account
 
 | # | Finding | Why it matters | Fix sketch | Effort |

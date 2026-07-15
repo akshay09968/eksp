@@ -313,11 +313,15 @@ func main() {
 	}()
 
 	<-ctx.Done()
+	a.shutdown(srv)
+}
 
-	// Drain sequence — see the package comment.
-	a.log.Info("SIGTERM: failing readiness, serving through deregistration", "delay", cfg.ShutdownDelay.String())
+// shutdown runs the drain sequence — see the package comment. Extracted from
+// main so the choreography is testable without delivering real signals.
+func (a *app) shutdown(srv *http.Server) {
+	a.log.Info("SIGTERM: failing readiness, serving through deregistration", "delay", a.cfg.ShutdownDelay.String())
 	a.beginDrain()
-	time.Sleep(cfg.ShutdownDelay)
+	time.Sleep(a.cfg.ShutdownDelay)
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
 	defer cancel()

@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -147,6 +148,96 @@ func TestReadyzFollowsDrainState(t *testing.T) {
 	a.routes().ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/healthz", nil))
 	if rr.Code != http.StatusOK {
 		t.Fatalf("healthz during drain = %d, want 200", rr.Code)
+	}
+}
+
+func TestConfigFromEnv(t *testing.T) {
+	t.Setenv("PORT", "9999")
+	t.Setenv("ROLE", "worker")
+	t.Setenv("WORKER_URL", "http://w.example")
+	t.Setenv("VERSION", "v9")
+	t.Setenv("SHUTDOWN_DELAY", "3s")
+
+	cfg := configFromEnv()
+	if cfg.Port != "9999" || cfg.Role != "worker" || cfg.WorkerURL != "http://w.example" ||
+		cfg.Version != "v9" || cfg.ShutdownDelay != 3*time.Second {
+		t.Fatalf("cfg = %+v", cfg)
+	}
+
+	// garbage duration falls back to the default, never panics or zeroes
+	t.Setenv("SHUTDOWN_DELAY", "banana")
+	if got := configFromEnv().ShutdownDelay; got != 15*time.Second {
+		t.Fatalf("bad SHUTDOWN_DELAY fallback = %v, want 15s", got)
+	}
+}
+
+func TestInstrumentRecoversPanics(t *testing.T) {
+	a := newTestApp("api", "")
+	h := a.instrument("/boom", func(http.ResponseWriter, *http.Request) {
+		panic("kaboom")
+	})
+
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/boom", nil)) // must not crash the test
+
+	// the panic is converted to a 500 and still lands in the metrics
+	rr = httptest.NewRecorder()
+	a.routes().ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/metrics", nil))
+	if !strings.Contains(rr.Body.String(), `route="/boom"`) {
+		t.Fatal("panicking request not recorded in http_requests_total")
+	}
+}
+
+// The drain contract end to end: readiness fails immediately, in-flight
+// requests finish, and shutdown waits at least ShutdownDelay before closing.
+func TestShutdownDrainsInflightRequests(t *testing.T) {
+	a := newTestApp("api", "")
+	a.cfg.ShutdownDelay = 50 * time.Millisecond
+
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := &http.Server{Handler: a.routes()}
+	go func() { _ = srv.Serve(ln) }()
+	base := "http://" + ln.Addr().String()
+
+	// in-flight slow request racing the shutdown
+	type result struct {
+		code int
+		err  error
+	}
+	done := make(chan result, 1)
+	go func() {
+		resp, err := http.Get(base + "/work?ms=200")
+		if err != nil {
+			done <- result{0, err}
+			return
+		}
+		defer resp.Body.Close()
+		done <- result{resp.StatusCode, nil}
+	}()
+
+	time.Sleep(20 * time.Millisecond) // let the slow request start
+
+	start := time.Now()
+	a.shutdown(srv)
+	elapsed := time.Since(start)
+
+	if elapsed < a.cfg.ShutdownDelay {
+		t.Fatalf("shutdown returned in %v — did not honor the %v drain delay", elapsed, a.cfg.ShutdownDelay)
+	}
+	if a.ready.Load() {
+		t.Fatal("still ready after shutdown — readiness must fail during drain")
+	}
+	r := <-done
+	if r.err != nil || r.code != http.StatusOK {
+		t.Fatalf("in-flight request during drain: code=%d err=%v — drain must not drop it", r.code, r.err)
+	}
+
+	// after shutdown completes, new connections are refused
+	if _, err := http.Get(base + "/healthz"); err == nil {
+		t.Fatal("server still accepting connections after Shutdown returned")
 	}
 }
 

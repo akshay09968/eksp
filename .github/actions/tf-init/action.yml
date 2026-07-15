@@ -1,0 +1,29 @@
+name: terraform init (S3 backend)
+description: >-
+  Init an env root against this account's state bucket with S3-native locking.
+  The backend contract (bucket naming, key layout, use_lockfile) lives here and
+  in the Makefile `init` target — change both together (AUDIT P2-12).
+
+inputs:
+  env:
+    description: environment root under terraform/envs/
+    required: true
+  region:
+    description: AWS region of the state bucket
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: init
+      shell: bash
+      env:
+        TF_ENV: ${{ inputs.env }}
+        TF_REGION: ${{ inputs.region }}
+      run: |
+        ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+        terraform -chdir="terraform/envs/${TF_ENV}" init -input=false \
+          -backend-config="bucket=eksp-tfstate-${ACCOUNT_ID}" \
+          -backend-config="key=envs/${TF_ENV}/terraform.tfstate" \
+          -backend-config="region=${TF_REGION}" \
+          -backend-config="use_lockfile=true"
