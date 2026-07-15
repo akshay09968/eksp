@@ -37,3 +37,8 @@ output "intra_subnet_cidrs" {
   description = "Intra subnet CIDRs (one /24 per AZ)."
   value       = local.intra_subnets
 }
+
+output "lb_access_log_bucket" {
+  description = "S3 bucket for ALB/NLB access logs. Wire into LB annotations via scripts/configure-repo.sh."
+  value       = aws_s3_bucket.lb_logs.bucket
+}

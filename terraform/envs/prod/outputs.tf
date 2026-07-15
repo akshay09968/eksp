@@ -27,3 +27,8 @@ output "next_steps" {
     4. make costwatch-ui   # costwatch
   EOT
 }
+
+output "lb_access_log_bucket" {
+  description = "S3 bucket receiving ALB/NLB access logs. Fill its account id into gitops/ LB annotations via scripts/configure-repo.sh."
+  value       = module.network.lb_access_log_bucket
+}

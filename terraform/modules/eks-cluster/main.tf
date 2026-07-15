@@ -41,6 +41,11 @@ module "eks" {
 
   enabled_log_types = ["api", "audit", "authenticator"]
 
+  # Explicit retention on the control-plane log group (COMPLIANCE #4). Without
+  # this the group defaults to never-expire — an unbounded cost line and a GDPR
+  # storage-limitation flag (audit logs can carry principal identities).
+  cloudwatch_log_group_retention_in_days = var.control_plane_log_retention_days
+
   addons = {
     vpc-cni = {
       most_recent    = true

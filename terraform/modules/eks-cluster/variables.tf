@@ -65,6 +65,17 @@ variable "admin_principal_arns" {
   default     = []
 }
 
+variable "control_plane_log_retention_days" {
+  description = "Retention for the EKS control-plane CloudWatch log group. Audit logs carry principal identities — bound the window (COMPLIANCE #4)."
+  type        = number
+  default     = 30
+
+  validation {
+    condition     = contains([1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1827, 3653], var.control_plane_log_retention_days)
+    error_message = "Must be a CloudWatch-supported retention value (e.g. 7, 14, 30, 90, 365)."
+  }
+}
+
 variable "coredns_min_replicas" {
   description = "CoreDNS autoscaling floor. DNS is the classic high-RPS failure mode — never let it scale to 1."
   type        = number

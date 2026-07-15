@@ -48,6 +48,18 @@ variable "interface_endpoints" {
   default     = []
 }
 
+variable "lb_access_log_retention_days" {
+  description = "Days to keep ALB/NLB access logs in S3. These carry client IPs (personal data under GDPR) — bound the window (COMPLIANCE #4)."
+  type        = number
+  default     = 30
+}
+
+variable "elb_account_id" {
+  description = "Regional ELB service account id for the access-log bucket policy (ALBs pre-2022 write as this principal). ap-south-1 = 718504428378; see AWS docs for other regions."
+  type        = string
+  default     = "718504428378"
+}
+
 variable "tags" {
   description = "Extra tags merged onto module-managed resources (provider default_tags cover the standard set)."
   type        = map(string)

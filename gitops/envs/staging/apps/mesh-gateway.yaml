@@ -11,7 +11,7 @@ spec:
   source:
     repoURL: https://github.com/akshay09968/eksp.git
     targetRevision: main
-    path: gitops/mesh/gateway
+    path: gitops/mesh/gateway/overlays/staging
   destination:
     server: https://kubernetes.default.svc
   syncPolicy:

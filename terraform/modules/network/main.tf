@@ -10,6 +10,8 @@ data "aws_availability_zones" "available" {
   state = "available"
 }
 
+data "aws_caller_identity" "current" {}
+
 locals {
   azs = slice(data.aws_availability_zones.available.names, 0, var.az_count)
 
@@ -121,4 +123,123 @@ module "vpc_endpoints" {
   )
 
   tags = var.tags
+}
+
+# ---------------------------------------------------------------------------
+# Load balancer access logs (COMPLIANCE #4). One bucket per env, empty until an
+# ALB/NLB is pointed at it via annotations. The lifecycle rule is the GDPR
+# storage-limitation control — these logs record client IPs (personal data).
+# ---------------------------------------------------------------------------
+
+resource "aws_s3_bucket" "lb_logs" {
+  bucket = "${var.name}-lb-logs-${data.aws_caller_identity.current.account_id}"
+}
+
+resource "aws_s3_bucket_public_access_block" "lb_logs" {
+  bucket                  = aws_s3_bucket.lb_logs.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "lb_logs" {
+  bucket = aws_s3_bucket.lb_logs.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      # ALB access-log delivery only supports SSE-S3 (AES256), not SSE-KMS.
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "lb_logs" {
+  bucket = aws_s3_bucket.lb_logs.id
+
+  rule {
+    id     = "expire-access-logs"
+    status = "Enabled"
+
+    filter {}
+
+    expiration {
+      days = var.lb_access_log_retention_days
+    }
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
+  }
+}
+
+data "aws_iam_policy_document" "lb_logs" {
+  # Older ALBs deliver logs as the regional ELB service account.
+  statement {
+    sid       = "ELBAccountWrite"
+    effect    = "Allow"
+    actions   = ["s3:PutObject"]
+    resources = ["${aws_s3_bucket.lb_logs.arn}/*"]
+
+    principals {
+      type        = "AWS"
+      identifiers = ["arn:aws:iam::${var.elb_account_id}:root"]
+    }
+  }
+
+  # NLBs and newer ALBs deliver via the log-delivery service principal.
+  statement {
+    sid       = "LogDeliveryWrite"
+    effect    = "Allow"
+    actions   = ["s3:PutObject"]
+    resources = ["${aws_s3_bucket.lb_logs.arn}/*"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["logdelivery.elasticloadbalancing.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "s3:x-amz-acl"
+      values   = ["bucket-owner-full-control"]
+    }
+  }
+
+  statement {
+    sid       = "LogDeliveryAclCheck"
+    effect    = "Allow"
+    actions   = ["s3:GetBucketAcl"]
+    resources = [aws_s3_bucket.lb_logs.arn]
+
+    principals {
+      type        = "Service"
+      identifiers = ["logdelivery.elasticloadbalancing.amazonaws.com"]
+    }
+  }
+
+  statement {
+    sid       = "DenyInsecureTransport"
+    effect    = "Deny"
+    actions   = ["s3:*"]
+    resources = [aws_s3_bucket.lb_logs.arn, "${aws_s3_bucket.lb_logs.arn}/*"]
+
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+
+    condition {
+      test     = "Bool"
+      variable = "aws:SecureTransport"
+      values   = ["false"]
+    }
+  }
+}
+
+resource "aws_s3_bucket_policy" "lb_logs" {
+  bucket = aws_s3_bucket.lb_logs.id
+  policy = data.aws_iam_policy_document.lb_logs.json
+
+  depends_on = [aws_s3_bucket_public_access_block.lb_logs]
 }

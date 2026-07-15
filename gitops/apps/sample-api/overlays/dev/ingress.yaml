@@ -13,8 +13,13 @@ metadata:
     alb.ingress.kubernetes.io/target-group-attributes: >-
       deregistration_delay.timeout_seconds=30,
       load_balancing.algorithm.type=least_outstanding_requests
+    # Access logs → the per-env bucket from terraform/modules/network (COMPLIANCE
+    # #4). Bucket name's account id is filled by scripts/configure-repo.sh.
     alb.ingress.kubernetes.io/load-balancer-attributes: >-
-      idle_timeout.timeout_seconds=60
+      idle_timeout.timeout_seconds=60,
+      access_logs.s3.enabled=true,
+      access_logs.s3.bucket=eksp-dev-lb-logs-000000000000,
+      access_logs.s3.prefix=sample-api
     # TLS: add certificate-arn + ssl-redirect annotations once you have a domain
     # (cert-manager/external-dns flags in terraform/modules/addons).
 spec:

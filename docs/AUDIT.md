@@ -35,6 +35,7 @@ audit method (run suites repeatedly, don't trust one green run) earns its cost.
 | Supply chain gate (issue #5) | ✅ publish job: trivy blocks promotion on HIGH/CRITICAL, cosign keyless signing binds digest→workflow identity, SPDX SBOM attached per run |
 | sample-api coverage (issue #7) | ✅ configFromEnv, panic-recovery, and full drain-choreography tests added (drain extracted from main() into `(*app).shutdown` for testability); CI floor raised to match measured coverage |
 | P2-11/12 refactors (issue #8) | ✅ `costs/service.go` split into service/aggregate/summary; the S3-backend init block now lives once in `.github/actions/tf-init` (used by plan, apply, drift) |
+| Access logs + retention (issue #4) | ✅ per-env encrypted LB-log bucket in `modules/network` (TLS-only, lifecycle-expiring); dev ALB + staging/prod NLB-gateway overlays wired; control-plane log group gets explicit retention. GDPR: PII source + expiry shipped together |
 
 ## P0 — fix before operating against a real account
 

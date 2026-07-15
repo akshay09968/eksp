@@ -28,8 +28,8 @@ itself a compliance artifact — auditors want it written down, so it lives here
 |---|---|---|
 | Control-plane audit logs | ✅ | api/audit/authenticator enabled |
 | Alerting with response procedures | ✅ | burn-rate + ops alerts; every `runbook_url` resolves to a RUNBOOK anchor |
-| **LB access logs** | ❌ | ALB/NLB access logging not enabled — the standard forensics ask. Fix: S3 bucket + `access_logs` attributes annotation (S effort) |
-| **Log retention policy** | ⚠️ | flow logs 14d (set); CloudWatch groups otherwise on defaults — define retention explicitly per group (cost + GDPR storage-limitation both want this) |
+| **LB access logs** | ✅ | per-env encrypted S3 bucket (`terraform/modules/network`, TLS-only, public-blocked, lifecycle-expiring); dev ALB Ingress + staging/prod NLB gateway overlays carry the `access_logs`/`access-log` annotations. Live-verify logs land after the first deploy |
+| **Log retention policy** | ✅ | flow logs 14d, control-plane group `control_plane_log_retention_days` (30d default, validated), LB access logs `lb_access_log_retention_days` (30d) — all explicit, none on never-expire |
 | State-bucket access logging | ❌ | S3 server access logs / CloudTrail data events on `eksp-tfstate-*` — auditors ask who touched state |
 | Drift detection | ✅ | two layers (ADR-0016): ArgoCD selfHeal + nightly plan→issue |
 
@@ -66,8 +66,8 @@ statement above:
 | Item | Status | Note |
 |---|---|---|
 | Records of processing (Art. 30) | ⚠️ | The scope statement above is the seed; formalize if any personal data ever lands (user accounts, request logs with IPs) |
-| **Personal data in logs** | ✅ today / ⚠️ trap | apps don't log request bodies/IPs; **ALB access logs (the CC7 fix) will contain client IPs = personal data under GDPR** — when enabling them, set retention + document purpose. This interaction is the exam question |
-| Storage limitation | ⚠️ | same retention work as CC7 |
+| **Personal data in logs** | ✅ | apps don't log request bodies/IPs; **LB access logs contain client IPs = personal data**, so they ship *with* the 30-day lifecycle expiry from day one — the retention control and the PII source landed together, not as an afterthought |
+| Storage limitation | ✅ | every log sink has an explicit bounded window (CC7 row) |
 | Data residency | ✅ | everything pinned ap-south-1 except the CE API call (us-east-1, billing metadata only — document in DPA review) |
 | Processor chain | ✅ | AWS under its DPA; no other subprocessors |
 | Erasure/portability | n/a | no data subjects; revisit on first user-facing feature |
@@ -87,8 +87,8 @@ claiming readiness without those would be false.
 ## The prioritized compliance to-do (code-level, ordered)
 
 1. **TLS on external listeners** (AUDIT P0-3) — every framework starts here.
-2. **ALB/NLB access logs + explicit CloudWatch retention everywhere** — with
-   the GDPR retention note baked in.
+2. ~~ALB/NLB access logs + explicit CloudWatch retention everywhere~~ ✅ done —
+   the GDPR retention note is baked in (logs + lifecycle shipped together).
 3. **Trivy gate in the publish workflow**; cosign+SBOM after.
 4. **Repo-settings checklist** post-push: branch protection, required checks,
    (private fork if operating a real account — AUDIT P0-2).

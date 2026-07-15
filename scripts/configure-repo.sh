@@ -33,6 +33,19 @@ grep -rl "$PLACEHOLDER_REGISTRY" gitops/ | while IFS= read -r f; do
   echo "registry  → $f"
 done
 
+# LB access-log bucket names embed the account id (COMPLIANCE #4). The account
+# is the leading 12 digits of the ECR registry host; fill the placeholder.
+ACCOUNT="${REGISTRY%%.*}"
+if printf '%s' "$ACCOUNT" | grep -Eq '^[0-9]{12}$'; then
+  grep -rl -- "-lb-logs-000000000000" gitops/ | while IFS= read -r f; do
+    sedi "s|-lb-logs-000000000000|-lb-logs-${ACCOUNT}|g" "$f"
+    echo "log bucket → $f"
+  done
+else
+  echo "WARN: could not derive a 12-digit account id from '$REGISTRY' — set the"
+  echo "      eksp-<env>-lb-logs-<account> bucket names in gitops/ by hand."
+fi
+
 echo
 echo "Done. Review with 'git diff', commit, push — ArgoCD picks it up from there."
 echo "Also set gitops_repo_url = \"$REPO_URL\" in terraform/envs/*/terraform.tfvars."

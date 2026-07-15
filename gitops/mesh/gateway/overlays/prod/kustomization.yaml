@@ -1,0 +1,23 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+
+patches:
+  # NLB access logs → the per-env bucket from terraform/modules/network
+  # (COMPLIANCE #4). Bucket account id is filled by scripts/configure-repo.sh.
+  - target:
+      group: gateway.networking.k8s.io
+      kind: Gateway
+      name: eksp-gateway
+    patch: |-
+      - op: add
+        path: /spec/infrastructure/annotations/service.beta.kubernetes.io~1aws-load-balancer-access-log-enabled
+        value: "true"
+      - op: add
+        path: /spec/infrastructure/annotations/service.beta.kubernetes.io~1aws-load-balancer-access-log-s3-bucket-name
+        value: eksp-prod-lb-logs-000000000000
+      - op: add
+        path: /spec/infrastructure/annotations/service.beta.kubernetes.io~1aws-load-balancer-access-log-s3-bucket-prefix
+        value: gateway
