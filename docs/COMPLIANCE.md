@@ -19,7 +19,7 @@ itself a compliance artifact — auditors want it written down, so it lives here
 | Human cluster access via IAM + access entries, no shared creds | ✅ | `eks-cluster` module, `authentication_mode = "API"` |
 | CI access via short-lived OIDC, no static keys | ✅ | `terraform/bootstrap` trust policies pin org/repo/ref/environment |
 | Workload identity, least privilege | ✅/⚠️ | Pod Identity everywhere; costwatch = 4 read-only CE actions + confused-deputy condition. **Gap:** apply role is `AdministratorAccess` (documented single-account trade, ADR/SECURITY.md) — an auditor will write this up; the answer is permission boundaries + per-stack roles in an org |
-| MFA/SSO on operator UIs (ArgoCD, Grafana, costwatch) | ❌ | port-forward-only today; **top hardening item.** SOC2 auditors treat UI auth as table stakes even for "internal" tools |
+| MFA/SSO on operator UIs (ArgoCD, Grafana, costwatch) | ✅ | GitHub SSO via each tool's native OIDC (ADR-0019): ArgoCD bundled Dex, Grafana `auth.github`, costwatch oauth2-proxy; org+team → RBAC. **Off until `github_sso_org` is set** (RUNBOOK #github-sso) — enable it before claiming this control; MFA is inherited from GitHub's org 2FA requirement |
 | Access reviews | ⚠️ | `admin_principal_arns` is code-reviewed (a real control!) but no periodic review procedure is written |
 
 ### CC7 — System operations (monitoring, incidents)
@@ -92,7 +92,8 @@ claiming readiness without those would be false.
 3. **Trivy gate in the publish workflow**; cosign+SBOM after.
 4. **Repo-settings checklist** post-push: branch protection, required checks,
    (private fork if operating a real account — AUDIT P0-2).
-5. **SSO for the three UIs** (oauth2-proxy pattern already in SECURITY.md).
+5. ~~SSO for the three UIs~~ ✅ done — native per-app GitHub OIDC (ADR-0019);
+   opt-in via RUNBOOK #github-sso.
 6. State-bucket access logging; AWS Budgets alarm (2-minute console add).
 7. Keep this document updated per change — an unmaintained compliance doc is
    worse than none in an audit.

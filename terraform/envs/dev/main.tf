@@ -74,6 +74,12 @@ module "gitops" {
 
   env_name = local.env
   repo_url = var.gitops_repo_url
+
+  # SSO (ADR-0019) — off until github_sso_org is set; secrets live in
+  # operator-created K8s Secrets, never in state (RUNBOOK #github-sso).
+  github_sso_org        = var.github_sso_org
+  github_sso_admin_team = var.github_sso_admin_team
+  argocd_url            = var.argocd_url
 }
 
 # ---------------------------------------------------------------------------

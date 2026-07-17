@@ -31,3 +31,24 @@ variable "gitops_repo_url" {
   type        = string
   default     = ""
 }
+
+# --- GitHub SSO (ADR-0019). All default off; secrets never pass through here —
+#     see docs/RUNBOOK.md#github-sso.
+
+variable "github_sso_org" {
+  description = "GitHub org whose members may log into the platform UIs. Empty disables SSO."
+  type        = string
+  default     = ""
+}
+
+variable "github_sso_admin_team" {
+  description = "GitHub team slug (within github_sso_org) mapped to admin roles. Required when github_sso_org is set."
+  type        = string
+  default     = ""
+}
+
+variable "argocd_url" {
+  description = "External URL ArgoCD is reached at — the OAuth callback base. Defaults to the port-forward address; set the real https host once ArgoCD has ingress + TLS (issue #1)."
+  type        = string
+  default     = "http://localhost:8080"
+}

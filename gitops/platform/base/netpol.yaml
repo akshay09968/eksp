@@ -75,12 +75,15 @@ spec:
   podSelector: {}
   policyTypes: [Ingress]
 ---
-# costwatch stays VPC-internal (port-forward / internal LB); cost data never
-# gets a public path.
+# costwatch never gets a public path — and never a VPC-wide one either: only
+# Prometheus (scrape) and the oauth2-proxy (SSO overlays, ADR-0019) may reach
+# it, so pod-IP access can't bypass auth once the proxy fronts it. The
+# `make costwatch-ui` port-forward is unaffected — kubelet-injected traffic
+# bypasses CNI policy enforcement.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-vpc-and-scrape
+  name: allow-sso-and-scrape
   namespace: costwatch
 spec:
   podSelector:
@@ -89,8 +92,9 @@ spec:
   policyTypes: [Ingress]
   ingress:
     - from:
-        - ipBlock:
-            cidr: 10.0.0.0/8
+        - podSelector:
+            matchLabels:
+              app: costwatch-sso
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: observability

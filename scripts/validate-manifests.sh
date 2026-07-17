@@ -15,9 +15,10 @@ fail=0
 echo "== kustomize overlays"
 while IFS= read -r kfile; do
   dir="$(dirname "$kfile")"
-  # bases are validated through their overlays
+  # bases and components can't build standalone — they're validated through
+  # the overlays that include them (components/sso via the *-sso overlays)
   case "$dir" in
-    */base) continue ;;
+    */base | */components/*) continue ;;
   esac
   echo "-- $dir"
   if ! kustomize build "$dir" | kubeconform "${KUBECONFORM_FLAGS[@]}"; then

@@ -1,0 +1,35 @@
+# Internal ALB → oauth2-proxy → costwatch. `scheme: internal` is the point:
+# cost data never gets a public path (base netpol enforces the same at L3).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: costwatch-sso
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internal
+    alb.ingress.kubernetes.io/target-type: ip # ALB → pod, no NodePort hop (ADR-0006)
+    alb.ingress.kubernetes.io/healthcheck-path: /ping
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+    alb.ingress.kubernetes.io/target-group-attributes: >-
+      deregistration_delay.timeout_seconds=30,
+      load_balancing.algorithm.type=least_outstanding_requests
+    # Access logs → the per-env bucket from terraform/modules/network. Account
+    # id is filled by scripts/configure-repo.sh; prod-sso patches the env name.
+    alb.ingress.kubernetes.io/load-balancer-attributes: >-
+      idle_timeout.timeout_seconds=60,
+      access_logs.s3.enabled=true,
+      access_logs.s3.bucket=eksp-dev-lb-logs-000000000000,
+      access_logs.s3.prefix=costwatch
+    # TLS: add certificate-arn + ssl-redirect once a domain exists (issue #1),
+    # then flip --cookie-secure=true in deployment.yaml.
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: costwatch-sso
+                port:
+                  number: 80

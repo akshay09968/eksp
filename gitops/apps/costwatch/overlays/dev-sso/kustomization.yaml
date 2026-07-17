@@ -1,0 +1,14 @@
+# dev + GitHub SSO (ADR-0019): everything in ../dev plus oauth2-proxy on an
+# internal ALB. Enable by pointing the costwatch Application's `path:` at this
+# overlay once the OAuth app + Secrets exist (docs/RUNBOOK.md#github-sso).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# The component's resources are added here, past base's namespace transformer.
+namespace: costwatch
+
+resources:
+  - ../dev
+
+components:
+  - ../../components/sso

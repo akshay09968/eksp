@@ -15,6 +15,98 @@ stable. Everything assumes `make kubeconfig ENV=<env>` has run.
 
 ---
 
+## GitHub SSO
+
+One-time enablement of GitHub login for ArgoCD, Grafana, and costwatch
+(ADR-0019). Everything stays off until `github_sso_org` is set — the platform
+applies clean without any of this. OAuth secrets live only in the Kubernetes
+Secrets below; they never enter git or Terraform state.
+
+### 1. Org + team (once)
+
+The org restriction in all three integrations needs a real GitHub **org** — a
+personal account won't do. Free tier is fine: github.com → Settings →
+Organizations → New organization. Inside it, create a team (e.g.
+`platform-admins`) and add yourself: org members land read-only, team members
+administer.
+
+### 2. Three OAuth apps (org → Settings → Developer settings → OAuth Apps)
+
+| App | Authorization callback URL |
+|---|---|
+| ArgoCD | `<argocd_url>/api/dex/callback` |
+| Grafana | `<grafana_url>/login/github` |
+| costwatch | `http://<internal-alb-dns>/oauth2/callback` |
+
+Until real ingress + TLS exists (issue #1) the port-forward addresses work:
+`http://localhost:8080` (ArgoCD), `http://localhost:3000` (Grafana). The
+costwatch ALB DNS appears in `kubectl -n costwatch get ingress costwatch-sso`
+after step 5.
+
+### 3. ArgoCD (Terraform side)
+
+In `terraform/envs/<env>/terraform.tfvars`:
+
+```hcl
+github_sso_org        = "your-org"
+github_sso_admin_team = "platform-admins"
+# argocd_url = "https://argocd.example.com"   # once issue #1 lands
+```
+
+`make plan apply ENV=<env>`, then hand ArgoCD its OAuth credentials — the chart
+config references `$dex.github.clientId`/`$dex.github.clientSecret`, which
+ArgoCD resolves from `argocd-secret` at runtime:
+
+```sh
+kubectl -n argocd patch secret argocd-secret --type merge \
+  -p '{"stringData":{"dex.github.clientId":"<id>","dex.github.clientSecret":"<secret>"}}'
+kubectl -n argocd rollout restart deploy argocd-dex-server
+```
+
+### 4. Grafana
+
+```sh
+kubectl -n observability create secret generic grafana-github-oauth \
+  --from-literal=client_id=<id> --from-literal=client_secret=<secret>
+kubectl -n observability rollout restart deploy kube-prometheus-stack-grafana
+```
+
+The secret refs in the kps values are `optional:` — Grafana runs password-only
+until this secret exists. Placeholders are filled in step 6.
+
+### 5. costwatch
+
+```sh
+kubectl -n costwatch create secret generic oauth2-proxy-github \
+  --from-literal=OAUTH2_PROXY_CLIENT_ID=<id> \
+  --from-literal=OAUTH2_PROXY_CLIENT_SECRET=<secret> \
+  --from-literal=OAUTH2_PROXY_COOKIE_SECRET="$(openssl rand -base64 32 | tr -- '+/' '-_')" \
+  --from-literal=OAUTH2_PROXY_REDIRECT_URL="http://<internal-alb-dns>/oauth2/callback"
+```
+
+Create this **before** step 6 — the proxy pod won't start without it. The ALB
+DNS is only known after the overlay flip, so: flip, read the Ingress hostname,
+set `OAUTH2_PROXY_REDIRECT_URL` + the OAuth app's callback, restart the proxy.
+
+### 6. GitOps placeholders + overlay flip
+
+```sh
+./scripts/configure-repo.sh <repo-url> <ecr-registry> <org> <team>
+```
+
+fills `GITHUB-SSO-ORG` / `GITHUB-SSO-ADMIN-TEAM` (Grafana values, oauth2-proxy
+args). Then point costwatch at the SSO overlay: in
+`gitops/envs/<env>/apps/costwatch.yaml` change `path:` to
+`gitops/apps/costwatch/overlays/<env>-sso`. Commit, push — ArgoCD converges.
+
+### Break-glass / rollback
+
+Local admin logins keep working with SSO on: `make argocd-password` and the
+Grafana admin secret (Access table above). Roll back by emptying
+`github_sso_org` (+ apply) and reverting the overlay flip.
+
+---
+
 ## SLO alerts
 
 ### slo-fast-burn

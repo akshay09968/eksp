@@ -1,6 +1,6 @@
 # ClusterIP only — cost data stays private. Access: make costwatch-ui
-# (port-forward); an oauth2-proxy-fronted internal ALB is the documented
-# hardening step (docs/SECURITY.md).
+# (port-forward), or the *-sso overlays' oauth2-proxy-fronted internal ALB
+# (ADR-0019, docs/RUNBOOK.md#github-sso).
 apiVersion: v1
 kind: Service
 metadata:

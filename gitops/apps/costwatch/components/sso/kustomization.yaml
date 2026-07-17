@@ -1,0 +1,11 @@
+# GitHub SSO for costwatch (ADR-0019): oauth2-proxy on an internal ALB.
+# Not built standalone (kind: Component) — included by overlays/dev-sso and
+# overlays/prod-sso, which is also how CI validates it.
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+
+resources:
+  - deployment.yaml
+  - service.yaml
+  - ingress.yaml
+  - netpol.yaml

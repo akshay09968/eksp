@@ -45,12 +45,14 @@ TLS-only policy, public-access-blocked.
 |---|---|---|
 | Public EKS endpoint (dev/staging) | portfolio usability | IAM authn + access entries; CIDR variable; **prod refuses 0.0.0.0/0 via validation** |
 | `AdministratorAccess` on the apply role | single-account demo; TF manages IAM itself | OIDC trust pinned to main/environments; org guidance: permission boundary + per-stack roles (comment in bootstrap) |
-| No UI auth on costwatch/Grafana/ArgoCD | not publicly routable | port-forward/VPC-only access; SSO is top of the hardening list |
+| UI auth (SSO) ships **off by default** | needs a GitHub org + 3 OAuth apps the operator must create | GitHub SSO for all three UIs is built (ADR-0019) — enable per RUNBOOK #github-sso; until then, nothing is publicly routable (port-forward/VPC-only) |
 | Open egress from pods | scope control | private subnets, mesh authz east-west; egress policy listed below |
 
 ## Hardening backlog (ordered)
 
-1. SSO (oauth2-proxy/IdP) for ArgoCD, Grafana, costwatch.
+1. ~~SSO for ArgoCD, Grafana, costwatch~~ ✅ done — GitHub OIDC per app
+   (ADR-0019): ArgoCD bundled Dex, Grafana `auth.github`, costwatch
+   oauth2-proxy on an internal ALB. Opt-in: RUNBOOK #github-sso.
 2. Private-only API endpoint + SSM/VPN path (flip `endpoint_public_access`).
 3. Egress NetworkPolicy + (optionally) mesh egress gateway.
 4. Image signing + verification (cosign + Kyverno/ArgoCD plugin).

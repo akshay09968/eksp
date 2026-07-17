@@ -1,0 +1,72 @@
+# oauth2-proxy fronting costwatch (ADR-0019): GitHub org+team gate. Cost data
+# is sensitive, so access is the platform team, not the whole org. The
+# oauth2-proxy-github Secret is operator-created (docs/RUNBOOK.md#github-sso);
+# the pod won't start without it, which is fine — this component only ships in
+# the *-sso overlays.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: costwatch-sso
+  labels:
+    app: costwatch-sso
+spec:
+  replicas: 1 # cookie sessions are stateless; internal tool, 1 is enough
+  selector:
+    matchLabels:
+      app: costwatch-sso
+  template:
+    metadata:
+      labels:
+        app: costwatch-sso
+    spec:
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: oauth2-proxy
+          # renovate: datasource=docker depName=quay.io/oauth2-proxy/oauth2-proxy
+          image: quay.io/oauth2-proxy/oauth2-proxy:v7.7.1
+          args:
+            - --http-address=0.0.0.0:4180
+            - --provider=github
+            - --github-org=GITHUB-SSO-ORG # filled by scripts/configure-repo.sh
+            - --github-team=GITHUB-SSO-ADMIN-TEAM # cost data: platform team only
+            - --email-domain=* # authz is org/team membership, not email domain
+            - --upstream=http://costwatch:80
+            # The internal ALB listens on plain HTTP until TLS lands (issue
+            # #1); a Secure cookie would never come back and loop the login.
+            - --cookie-secure=false
+          envFrom:
+            # OAUTH2_PROXY_CLIENT_ID / _CLIENT_SECRET / _COOKIE_SECRET /
+            # _REDIRECT_URL — operator-created, never in git or Terraform state.
+            - secretRef:
+                name: oauth2-proxy-github
+          ports:
+            - name: http
+              containerPort: 4180
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              memory: 128Mi
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: http
+            periodSeconds: 15
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]

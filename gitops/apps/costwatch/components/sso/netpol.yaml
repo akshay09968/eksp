@@ -1,0 +1,19 @@
+# The VPC (i.e. the internal ALB) talks to the proxy on 4180 only; ingress to
+# costwatch itself is pinned to this proxy + Prometheus in
+# platform/base/netpol.yaml, so pod-IP access can't bypass auth.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-vpc-to-sso
+spec:
+  podSelector:
+    matchLabels:
+      app: costwatch-sso
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - ipBlock:
+            cidr: 10.0.0.0/8
+      ports:
+        - port: 4180
+          protocol: TCP

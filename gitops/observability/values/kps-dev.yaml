@@ -52,6 +52,35 @@ grafana:
     limits:
       memory: 256Mi
 
+  # --- GitHub SSO (ADR-0019): Grafana's native auth.github. GITHUB-SSO-*
+  # placeholders are filled by scripts/configure-repo.sh; the client id/secret
+  # come from the grafana-github-oauth Secret the operator creates
+  # (docs/RUNBOOK.md#github-sso). Both refs are optional so Grafana starts —
+  # password login only — before SSO is configured.
+  envValueFrom:
+    GF_AUTH_GITHUB_CLIENT_ID:
+      secretKeyRef:
+        name: grafana-github-oauth
+        key: client_id
+        optional: true
+    GF_AUTH_GITHUB_CLIENT_SECRET:
+      secretKeyRef:
+        name: grafana-github-oauth
+        key: client_secret
+        optional: true
+  grafana.ini:
+    server:
+      # OAuth callback base — <root_url>/login/github. Port-forward address
+      # until Grafana gets a real host (issue #1).
+      root_url: http://localhost:3000
+    auth.github:
+      enabled: true
+      allow_sign_up: true
+      scopes: read:org,user:email
+      allowed_organizations: GITHUB-SSO-ORG
+      # Platform team administers; everyone else in the org observes.
+      role_attribute_path: "contains(groups[*], '@GITHUB-SSO-ORG/GITHUB-SSO-ADMIN-TEAM') && 'Admin' || 'Viewer'"
+
 alertmanager:
   alertmanagerSpec:
     resources:

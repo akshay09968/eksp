@@ -1,7 +1,7 @@
 # ArgoCD + the per-env root Application (app-of-apps). Terraform's GitOps
 # involvement ends here: after this, everything in gitops/ is ArgoCD's problem
-# (ADR-0004). No ingress — access is `make argocd-ui` (port-forward); SSO is the
-# documented hardening step (ADR-0013).
+# (ADR-0004). No ingress — access is `make argocd-ui` (port-forward); GitHub
+# SSO is opt-in via github_sso_org (ADR-0019, RUNBOOK #github-sso).
 
 locals {
   system_scheduling = {
@@ -14,6 +14,38 @@ locals {
       effect   = "NoSchedule"
     }]
   }
+
+  # --- GitHub SSO (ADR-0019): ArgoCD's bundled Dex with a github connector.
+  # The $dex.github.* placeholders are resolved by ArgoCD from the argocd-secret
+  # Secret at runtime — the operator patches those keys in out-of-band
+  # (RUNBOOK #github-sso), so no OAuth credential ever enters Terraform state.
+  sso_enabled = var.github_sso_org != ""
+
+  argocd_cm = local.sso_enabled ? {
+    url = var.argocd_url
+    "dex.config" = yamlencode({
+      connectors = [{
+        type = "github"
+        id   = "github"
+        name = "GitHub"
+        config = {
+          clientID      = "$dex.github.clientId"
+          clientSecret  = "$dex.github.clientSecret"
+          orgs          = [{ name = var.github_sso_org }]
+          teamNameField = "slug"
+          useLoginAsID  = true
+        }
+      }]
+    })
+  } : {}
+
+  # Org members are read-only; only the named team administers. Group claims
+  # arrive as "org:team-slug" from the Dex github connector.
+  argocd_rbac = local.sso_enabled ? {
+    "policy.default" = "role:readonly"
+    "policy.csv"     = "g, ${var.github_sso_org}:${var.github_sso_admin_team}, role:admin\n"
+    scopes           = "[groups]"
+  } : {}
 }
 
 resource "helm_release" "argocd" {
@@ -31,6 +63,8 @@ resource "helm_release" "argocd" {
         # would otherwise self-sign and break the CLI.
         "server.insecure" = true
       }
+      cm   = local.argocd_cm
+      rbac = local.argocd_rbac
     }
 
     controller = local.system_scheduling
@@ -40,13 +74,22 @@ resource "helm_release" "argocd" {
       enabled = true
     })
     redis = local.system_scheduling
-    dex = {
-      enabled = false # no SSO in v1 — see docs/SECURITY.md hardening list
-    }
+    # Bundled Dex comes up only when SSO is configured (ADR-0019); the local
+    # admin account stays enabled as break-glass either way.
+    dex = merge(local.system_scheduling, {
+      enabled = local.sso_enabled
+    })
     notifications = {
       enabled = false
     }
   })]
+
+  lifecycle {
+    precondition {
+      condition     = !local.sso_enabled || var.github_sso_admin_team != ""
+      error_message = "github_sso_org is set but github_sso_admin_team is empty — without a team→role:admin mapping every SSO user lands read-only and nobody can administer. Set the team slug (ADR-0019)."
+    }
+  }
 }
 
 resource "helm_release" "root_app" {

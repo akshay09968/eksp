@@ -23,3 +23,4 @@ copy [template.md](template.md), next number, link it from code comments.
 | [0016](0016-drift-detection.md) | Two-layer drift detection |
 | [0017](0017-api-gateway-strategy.md) | API gateway: in-mesh gateway, not Amazon API Gateway |
 | [0018](0018-stdlib-sample-app.md) | sample-api stays stdlib-only |
+| [0019](0019-github-sso.md) | GitHub SSO via each tool's native OIDC (not a shared broker) |
