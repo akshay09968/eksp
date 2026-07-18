@@ -55,8 +55,15 @@ itself a compliance artifact — auditors want it written down, so it lives here
 ### Availability (if in scope for your report)
 
 ⚠️ Single-instance Prometheus (metrics loss on node loss = accepted, documented);
-❌ no state-bucket cross-region replication; ❌ no cluster backup (Velero) —
-defensible for stateless workloads, write the determination down when scoping.
+✅ state-bucket cross-region replication (issue #18): every state-object version
+replicates ap-south-1 → `state_replica_region` (default ap-southeast-1), CMKs
+both ends, delete markers included — the state bucket is the one artifact git
+cannot rebuild. Ships in `terraform/bootstrap`; counts once `make bootstrap`
+has applied it.
+❌ no cluster backup (Velero) — **deliberate, not missing**: cluster state is
+git (ArgoCD) + Terraform; the only in-cluster data is Prometheus history, whose
+loss is the accepted ⚠️ above. Revisit the moment a stateful workload lands.
+Defensible for stateless workloads — write the determination down when scoping.
 
 ## GDPR
 

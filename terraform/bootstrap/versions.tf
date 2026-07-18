@@ -21,3 +21,17 @@ provider "aws" {
     }
   }
 }
+
+# DR region for state-bucket replication (issue #18, state-replication.tf).
+provider "aws" {
+  alias  = "replica"
+  region = var.state_replica_region
+
+  default_tags {
+    tags = {
+      Project   = "eksp"
+      Component = "bootstrap"
+      ManagedBy = "terraform"
+    }
+  }
+}

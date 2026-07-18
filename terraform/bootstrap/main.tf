@@ -35,6 +35,9 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "tf_state" {
   rule {
     apply_server_side_encryption_by_default {
       sse_algorithm = "aws:kms"
+      # CMK, not the aws/s3 managed key: replication (state-replication.tf)
+      # silently skips objects encrypted with the AWS-managed key.
+      kms_master_key_id = aws_kms_key.tf_state.arn
     }
     bucket_key_enabled = true
   }
