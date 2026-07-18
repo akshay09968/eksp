@@ -29,9 +29,9 @@ jobs:
             dir: apps/costwatch/backend
             coverage_floor: 80
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version-file: ${{ matrix.dir }}/go.mod
           cache-dependency-path: ${{ matrix.dir }}/go.sum
@@ -51,9 +51,9 @@ jobs:
     name: costwatch UI typecheck + build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: npm
@@ -87,22 +87,22 @@ jobs:
             context: apps/costwatch
             overlays: gitops/apps/costwatch/overlays
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
-      - uses: aws-actions/configure-aws-credentials@v4
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
         with:
           role-to-assume: ${{ vars.AWS_ECR_PUSH_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION || 'ap-south-1' }}
 
-      - uses: aws-actions/amazon-ecr-login@v2
+      - uses: aws-actions/amazon-ecr-login@d539f0932e70871a027e9d5a9d8fc38589180a64 # v2.1.6
         id: ecr
 
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
       - name: build + push (amd64 + arm64)
         id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: ${{ matrix.context }}
           platforms: linux/amd64,linux/arm64
@@ -117,7 +117,7 @@ jobs:
       # pushed image blocks the promotion PR — the image exists in ECR but
       # never reaches an overlay. .trivyignore documents accepted findings.
       - name: trivy gate (HIGH/CRITICAL block promotion)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@915b19bbe73b92a6cf82a1bc12b087c9a19a5fe2 # v0.28.0
         with:
           image-ref: ${{ steps.ecr.outputs.registry }}/eksp/${{ matrix.app }}@${{ steps.build.outputs.digest }}
           severity: HIGH,CRITICAL
@@ -125,7 +125,7 @@ jobs:
           ignore-unfixed: true
 
       - name: install cosign
-        uses: sigstore/cosign-installer@v3
+        uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3.10.1
 
       # Keyless signing: the signature binds this image digest to this exact
       # workflow identity (repo, ref, run) via the GitHub OIDC token.
@@ -135,7 +135,7 @@ jobs:
         run: cosign sign --yes "$IMAGE"
 
       - name: SBOM (spdx) as run artifact
-        uses: anchore/sbom-action@v0
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
         with:
           image: ${{ steps.ecr.outputs.registry }}/eksp/${{ matrix.app }}@${{ steps.build.outputs.digest }}
           format: spdx-json
@@ -153,7 +153,7 @@ jobs:
             "${OVERLAYS}/dev/kustomization.yaml"
 
       - name: open promotion PR
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7.0.11
         with:
           branch: promote/${{ matrix.app }}-v0.1.${{ github.run_number }}
           title: "deploy(${{ matrix.app }}): v0.1.${{ github.run_number }} to dev"

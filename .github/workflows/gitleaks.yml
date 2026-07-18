@@ -1,0 +1,30 @@
+# Secret scanning in CI (issue #13). The pre-commit gitleaks hook is opt-in
+# per clone — this is the enforced backstop. No paths filter: secrets can land
+# anywhere. fetch-depth 0 so the full history is scanned, not just the diff.
+name: gitleaks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gitleaks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scan:
+    name: gitleaks (full history)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # GITLEAKS_LICENSE is only required for org-owned repos; this repo is
+          # personal. Add the secret if it ever moves into an org.

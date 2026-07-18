@@ -17,9 +17,11 @@ humans ──access entries──► cluster RBAC
 **Supply chain & CI** — zero static AWS keys (OIDC only, trust conditions pin
 org/repo/ref/environment); fork PRs get no cloud access; workflow-injection
 guidance applied (untrusted text never expression-interpolated into scripts);
-checkov + tflint + actionlint in CI; gitleaks in pre-commit; Renovate keeps
-pins current; ECR scan-on-push with immutable tags; images are distroless
-static (no shell, ~2 MB surface), built from lockfiles.
+checkov + tflint + actionlint in CI; gitleaks full-history scan in CI (the
+pre-commit hook is the fast path, CI is the enforced backstop); third-party
+actions pinned to commit SHAs (tags are mutable — tj-actions, 2025); Renovate
+keeps pins + SHA digests current; ECR scan-on-push with immutable tags; images
+are distroless static (no shell, ~2 MB surface), built from lockfiles.
 
 **Cluster** — access entries API mode (no aws-auth ConfigMap drift), KMS
 envelope encryption for Secrets, control-plane audit logs on, IMDSv2 required

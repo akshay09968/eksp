@@ -59,8 +59,11 @@ flowchart LR
 | Observability | kube-prometheus-stack, multiwindow burn-rate SLO alerts, RED dashboard as code |
 | FinOps | costwatch (this repo's own app) + honest [COST.md](docs/COST.md) + spot/Graviton strategy |
 | Security | OIDC-only CI, Pod Identity, restricted PSS, default-deny NetworkPolicy, KMS secrets, IMDSv2, checkov/tflint/gitleaks |
-| IaC quality | Wrapped community modules, `terraform test` with mock providers, S3-native state locking, Renovate |
+| IaC quality | Wrapped community modules, `terraform test` with mock providers, S3-native state locking, Renovate¹ |
 | AI harness | CLAUDE.md conventions + `.claude/settings.json` guardrails (agents cannot apply/destroy) |
+
+¹ renovate.json is inert until the [Renovate GitHub App](https://github.com/apps/renovate)
+is enabled on the repo (one-time human step) — weekly PRs, Mondays IST.
 
 ## Quickstart
 

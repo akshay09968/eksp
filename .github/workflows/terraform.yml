@@ -22,15 +22,15 @@ jobs:
     name: fmt · validate · tflint · test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
-      - uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
       # Providers are ~500MB across the roots; cache them keyed on lockfiles.
       - name: cache terraform providers
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.terraform.d/plugin-cache
           key: tfproviders-${{ runner.os }}-${{ hashFiles('**/.terraform.lock.hcl') }}
@@ -59,7 +59,7 @@ jobs:
             terraform -chdir="$m" test
           done
 
-      - uses: terraform-linters/setup-tflint@v4
+      - uses: terraform-linters/setup-tflint@90f302c255ef959cbfb4bd10581afecdb7ece3e6 # v4.1.1
 
       - name: tflint
         run: tflint --recursive --format compact
@@ -74,9 +74,9 @@ jobs:
     name: checkov security scan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
-      - uses: bridgecrewio/checkov-action@v12
+      - uses: bridgecrewio/checkov-action@7b972723c44fb3d256283fac96fae5d7c1894bb7 # v12.3114.0
         with:
           directory: terraform
           quiet: true
@@ -108,14 +108,14 @@ jobs:
       matrix:
         env: [dev, staging, prod]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
-      - uses: aws-actions/configure-aws-credentials@v4
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
         with:
           role-to-assume: ${{ vars.AWS_PLAN_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION || 'ap-south-1' }}
 
-      - uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
@@ -134,7 +134,7 @@ jobs:
       # filesystem + JS string building, never workflow-expression interpolation
       # (GitHub Actions injection guidance).
       - name: comment plan on PR
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         env:
           PLAN_ENV: ${{ matrix.env }}
         with:

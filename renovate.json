@@ -1,7 +1,23 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended", ":semanticCommits", "group:allNonMajor"],
+  "extends": [
+    "config:recommended",
+    ":semanticCommits",
+    "group:allNonMajor",
+    "helpers:pinGitHubActionDigests"
+  ],
   "labels": ["dependencies"],
+  "timezone": "Asia/Kolkata",
+  "schedule": ["before 9am on monday"],
+  "prConcurrentLimit": 5,
+  "postUpdateOptions": ["gomodTidy"],
+  "packageRules": [
+    {
+      "description": "EKS minor bumps are an operator procedure (RUNBOOK 'EKS version upgrade'), not a merge — the dashboard entry is the EOL reminder (issue #16)",
+      "matchDepNames": ["amazon-eks"],
+      "dependencyDashboardApproval": true
+    }
+  ],
   "terraform": { "enabled": true },
   "gomod": { "enabled": true },
   "npm": { "enabled": true },
@@ -23,6 +39,24 @@
       "matchStrings": [
         "# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>[^\\s]+)( registryUrl=(?<registryUrl>[^\\s]+))?\\s*\\n\\s*targetRevision:\\s*\"?(?<currentValue>[^\"\\s]+)\"?"
       ]
+    },
+    {
+      "customType": "regex",
+      "description": "Container image pins under renovate comments (oauth2-proxy, nodelocal-dns)",
+      "managerFilePatterns": ["/^gitops/.+\\.ya?ml$/", "/^terraform/charts/.+\\.ya?ml$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>[^\\s]+)\\s*\\n\\s*image:\\s*[^\\s\"]+?:(?<currentValue>[^\\s\"]+)"
+      ]
+    },
+    {
+      "customType": "regex",
+      "description": "Dated Karpenter AMI pins in staging/prod (issue #15) — bumps arrive as PRs from amazon-eks-ami releases",
+      "managerFilePatterns": ["/^terraform/envs/.+/main\\.tf$/"],
+      "matchStrings": [
+        "ami_alias\\s*=\\s*\"al2023@(?<currentValue>v[0-9]{8})\""
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "awslabs/amazon-eks-ami"
     }
   ]
 }
