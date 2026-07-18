@@ -7,7 +7,10 @@ variable "region" {
 variable "kubernetes_version" {
   description = "EKS Kubernetes version."
   type        = string
-  default     = "1.33"
+  # EOL tracking (issue #16): endoflife-date surfaces newer minors before AWS
+  # extended-support billing starts; bumps need the RUNBOOK upgrade procedure.
+  # renovate: datasource=endoflife-date depName=amazon-eks
+  default = "1.33"
 }
 
 variable "endpoint_public_access_cidrs" {

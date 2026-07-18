@@ -81,6 +81,7 @@ resource "helm_release" "karpenter_resources" {
     cpuLimitSpot     = tostring(var.cpu_limit_spot)
     cpuLimitOnDemand = tostring(var.cpu_limit_on_demand)
     nodeVolumeSizeGi = var.node_volume_size_gi
+    amiAlias         = var.ami_alias
 
     disruptionBudgets = var.disruption_budgets
   })]

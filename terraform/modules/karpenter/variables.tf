@@ -62,6 +62,17 @@ variable "node_volume_size_gi" {
   default     = 50
 }
 
+variable "ami_alias" {
+  description = "EC2NodeClass amiSelectorTerms alias. al2023@latest lets every AMI release roll nodes at Karpenter's discretion — fine for dev; staging/prod pin a dated release (al2023@vYYYYMMDD) so AMI rollouts arrive as reviewable PRs (issue #15)."
+  type        = string
+  default     = "al2023@latest"
+
+  validation {
+    condition     = can(regex("^al2023@(latest|v[0-9]{8})$", var.ami_alias))
+    error_message = "ami_alias must be al2023@latest or a dated release like al2023@v20260709 (see awslabs/amazon-eks-ami releases)."
+  }
+}
+
 variable "disruption_budgets" {
   description = "Karpenter disruption budgets. Default: at most 10% of nodes at once; prod adds a business-hours freeze."
   type        = list(map(string))

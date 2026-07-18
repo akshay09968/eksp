@@ -37,3 +37,15 @@ run "rejects_negative_fallback_ceiling" {
 
   expect_failures = [var.cpu_limit_on_demand]
 }
+
+# A freeform alias (wrong family, undated pin) would surface as a node-launch
+# failure at 3am, not at plan — catch it here (issue #15).
+run "rejects_freeform_ami_alias" {
+  command = plan
+
+  variables {
+    ami_alias = "al2023@2026-07-09"
+  }
+
+  expect_failures = [var.ami_alias]
+}

@@ -58,6 +58,10 @@ module "karpenter" {
   cpu_limit_spot      = 1000
   cpu_limit_on_demand = 256
 
+  # Dated pin: AMI rollouts land as Renovate PRs, not at Karpenter's whim
+  # (issue #15). Dev rides al2023@latest; rolling procedure: RUNBOOK "AMI bump".
+  ami_alias = "al2023@v20260709"
+
   controller_replicas = 2
   controller_resources = {
     cpu    = "500m"

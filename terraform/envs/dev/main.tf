@@ -47,6 +47,9 @@ module "karpenter" {
   cpu_limit_spot      = 48
   cpu_limit_on_demand = 16
 
+  # dev deliberately rides ami_alias = al2023@latest (module default): fresh
+  # AMIs get burned in here before the staging/prod dated pins bump (issue #15).
+
   controller_replicas = 1 # dev: no HA needed; prod runs 2
   controller_resources = {
     cpu    = "100m"

@@ -192,14 +192,29 @@ Nightly workflow opened a `drift` issue: someone changed AWS outside Terraform.
 
 ### EKS version upgrade
 
-Control plane → addons → nodes, one env at a time, dev soak ≥ 1 week:
+Control plane → addons → nodes, one env at a time, dev soak ≥ 1 week.
+Renovate's `endoflife-date` watch on `kubernetes_version` (dashboard-approval
+gated) is the EOL clock — act before standard support ends and extended-support
+billing (~$0.60/hr/cluster) starts.
 
 1. Bump `kubernetes_version` in `terraform/envs/dev`; `make plan apply ENV=dev`.
 2. Addons follow automatically (`most_recent = true`) on the next apply.
 3. System MNG: apply rolls it (respects CoreDNS PDB).
-4. Karpenter nodes: `al2023@latest` + 30d expiry converge naturally; force with
-   `kubectl delete nodeclaim <one-at-a-time>` if a CVE demands speed.
+4. Karpenter nodes: dev's `al2023@latest` + 30d expiry converge naturally;
+   staging/prod need their dated `ami_alias` pins bumped (next section). Force
+   with `kubectl delete nodeclaim <one-at-a-time>` if a CVE demands speed.
 5. Watch: `kubectl get nodes` versions, ArgoCD all-green, RED dashboard flat.
+
+### AMI bump (staging/prod dated pins)
+
+Dev rides `al2023@latest`; staging/prod pin `ami_alias = "al2023@vYYYYMMDD"`
+(issue #15) so node-image rollouts are change-controlled:
+
+1. Renovate PR bumps the pin (source: awslabs/amazon-eks-ami releases). Check
+   dev — it has been on newer AMIs since release day; any breakage showed there.
+2. Merge → `make plan apply ENV=staging`; Karpenter drift-replaces nodes under
+   the disruption budgets (10% at a time, prod adds business-hours freeze).
+3. Same for prod after staging soaks. Rollback = revert the pin, re-apply.
 
 ### Rotate/drain a node
 

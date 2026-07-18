@@ -47,6 +47,10 @@ module "karpenter" {
 
   cpu_limit_spot      = 200
   cpu_limit_on_demand = 64
+
+  # Dated pin: AMI rollouts land as Renovate PRs, not at Karpenter's whim
+  # (issue #15). Dev rides al2023@latest; rolling procedure: RUNBOOK "AMI bump".
+  ami_alias = "al2023@v20260709"
 }
 
 # No depends_on: the helm provider is configured from module.eks outputs, so
