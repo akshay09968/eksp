@@ -37,7 +37,19 @@ audit method (run suites repeatedly, don't trust one green run) earns its cost.
 | P2-11/12 refactors (issue #8) | ✅ `costs/service.go` split into service/aggregate/summary; the S3-backend init block now lives once in `.github/actions/tf-init` (used by plan, apply, drift) |
 | Access logs + retention (issue #4) | ✅ per-env encrypted LB-log bucket in `modules/network` (TLS-only, lifecycle-expiring); dev ALB + staging/prod NLB-gateway overlays wired; control-plane log group gets explicit retention. GDPR: PII source + expiry shipped together |
 
-## P0 — fix before operating against a real account
+## Debt review (2026-07-18) — first `/debt-review` cycle
+
+Filed and closed #11–#18 same cycle (commits `5242fef…b63eb40`). Findings:
+Renovate config **dormant** (app never enabled — one mis-audit corrected: the
+config existed, the earlier "missing" claim came from a zsh glob abort);
+actions on mutable tags (incl. a nonexistent `trivy-action@0.28.0` tag that
+would have failed the first publish run); gitleaks pre-commit-only;
+kubeconform skipping all CRD kinds; `al2023@latest` rolling prod nodes
+uncontrolled; no EKS EOL clock; chart pins skewable invisibly; state bucket
+single-region. Checked clean: `.terraform` ignore hygiene, ECR lifecycle,
+drift-issue dedup, secrets handling, coverage floors.
+**Open human steps:** enable the Renovate GitHub App; re-run `make bootstrap`
+for state replication. Next review: compare against this list.
 
 | # | Finding | Why it matters | Fix sketch | Effort |
 |---|---|---|---|---|

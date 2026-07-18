@@ -13,7 +13,7 @@ hourly/daily/monthly. Portfolio project — quality bar is "staff engineer revie
 | `apps/` | sample-api (scale demo) + costwatch (Go+React FinOps) | app CI | `apps/CLAUDE.md` |
 | `load/k6/` | load scenarios encoding the SLOs | — | thresholds = SLOs |
 | `docs/adr/` | every non-obvious decision — read before proposing changes | — | `/new-adr` skill |
-| `docs/AUDIT.md` | known weaknesses + remediation log | — | work top-down |
+| `docs/AUDIT.md` | known weaknesses + remediation log | — | work top-down; `/debt-review` re-audits |
 
 **The boundary rule (ADR-0004):** needs AWS IAM or must exist before workloads
 schedule → Terraform. Everything else in-cluster → `gitops/` (ArgoCD).
