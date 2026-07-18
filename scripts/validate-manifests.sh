@@ -1,14 +1,17 @@
 #!/usr/bin/env bash
 # Validate every kustomize overlay and raw manifest dir against Kubernetes schemas.
-# Strict on core objects; CRD kinds (Application, PrometheusRule, NodePool, ...) are
-# skipped via -ignore-missing-schemas. Offline, no cluster needed. Used by `make
+# Strict on core objects; CRD kinds (Application, PrometheusRule, NodePool, ...)
+# validate against the community CRDs-catalog (issue #14) — fetched over the
+# network, so this needs egress; kinds missing from the catalog still skip via
+# -ignore-missing-schemas rather than fail. No cluster needed. Used by `make
 # kubeconform` and CI.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
 KUBECONFORM_FLAGS=(-strict -ignore-missing-schemas -summary
-  -schema-location default)
+  -schema-location default
+  -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json')
 
 fail=0
 

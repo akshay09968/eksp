@@ -81,8 +81,12 @@ frontend-test: ## Unit-test the costwatch UI (vitest)
 env-parity: ## Shared env files must not silently diverge (ADR-0002 guard)
 	./scripts/check-env-parity.sh
 
+.PHONY: chart-skew
+chart-skew: ## Surface chart-pin drift between envs (warning-only; issue #17)
+	./scripts/check-chart-skew.sh
+
 .PHONY: check
-check: fmt-check lint validate tf-test helm-lint kubeconform app-test env-parity ## Everything CI runs, locally
+check: fmt-check lint validate tf-test helm-lint kubeconform app-test env-parity chart-skew ## Everything CI runs, locally
 
 ##@ Deploy (requires AWS credentials — intentionally explicit)
 
