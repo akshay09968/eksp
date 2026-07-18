@@ -52,14 +52,14 @@ flowchart LR
 
 | Concern | Implementation |
 |---|---|
-| Compute at scale | Karpenter 1.13: spot-first + on-demand fallback pools, consolidation budgets, 30d node expiry, conntrack tuning |
+| Compute at scale | Karpenter 1.13: spot-first + on-demand fallback pools, consolidation budgets, 30d node expiry, conntrack tuning, dated AMI pins in staging/prod (dev burns in `@latest`) |
 | Traffic at scale | ALB/NLB ip-mode targets, RPS-based HPA (prometheus-adapter), NodeLocal DNSCache, prefix delegation, zero-error rolling deploys (in-app drain ↔ deregistration alignment) |
 | Zero-trust | Istio **ambient** STRICT mTLS + AuthorizationPolicy + waypoint L7 policy ([ADR-0011](docs/adr/0011-istio-ambient-mesh.md)) |
 | GitOps | ArgoCD app-of-apps per env, sync waves, image promotion via CI-opened PRs |
 | Observability | kube-prometheus-stack, multiwindow burn-rate SLO alerts, RED dashboard as code |
 | FinOps | costwatch (this repo's own app) + honest [COST.md](docs/COST.md) + spot/Graviton strategy |
-| Security | OIDC-only CI, Pod Identity, restricted PSS, default-deny NetworkPolicy, KMS secrets, IMDSv2, checkov/tflint/gitleaks |
-| IaC quality | Wrapped community modules, `terraform test` with mock providers, S3-native state locking, Renovate¹ |
+| Security | OIDC-only CI, Pod Identity, restricted PSS, default-deny NetworkPolicy, KMS secrets, IMDSv2, checkov/tflint, gitleaks in CI, SHA-pinned actions, opt-in GitHub SSO for all three UIs ([ADR-0019](docs/adr/0019-github-sso.md)) |
+| IaC quality | Wrapped community modules, `terraform test` with mock providers, S3-native state locking + cross-region state DR, CRD-schema kubeconform, env-parity + chart-skew guards, Renovate¹ |
 | AI harness | CLAUDE.md conventions + `.claude/settings.json` guardrails (agents cannot apply/destroy) |
 
 ¹ renovate.json is inert until the [Renovate GitHub App](https://github.com/apps/renovate)
@@ -97,9 +97,10 @@ make costwatch-ui                    # your AWS bill, traced
 make costwatch-demo                  # http://localhost:8080
 ```
 
-Offline verification (what CI runs): `make check` — fmt, tflint, validate ×4
-roots, mocked `terraform test`, helm lint, kubeconform on every overlay, and
-both apps' unit tests. No cloud credentials needed.
+Local verification (what CI runs): `make check` — fmt, tflint, validate ×4
+roots, mocked `terraform test`, helm lint, kubeconform on every overlay
+(CRD kinds validate against the community schema catalog), env-parity +
+chart-skew guards, and both apps' unit tests. No cloud credentials needed.
 
 ## Repo map
 
@@ -123,13 +124,15 @@ docs/        ARCHITECTURE · SCALING · RUNBOOK · COST · SECURITY · INTERVIEW
 - [AUDIT.md](docs/AUDIT.md) — self-audit: prioritized weaknesses, measured coverage gaps, refactoring candidates
 - [COMPLIANCE.md](docs/COMPLIANCE.md) — SOC2/GDPR/HIPAA code-level readiness, honestly scored
 - [INTERVIEW.md](docs/INTERVIEW.md) — how to walk a panel through this repo
-- [docs/adr/](docs/adr/) — 18 decision records, including the rejected options
+- [docs/adr/](docs/adr/) — 19 decision records, including the rejected options
 
 ## Roadmap (deliberately not built — see ADRs for why)
 
-Multi-region active/active · private-only API endpoint + VPN · SSO (ArgoCD,
-Grafana, costwatch) · CUR 2.0 → Athena deep cost lineage (flag exists) ·
-Thanos/Mimir long-term metrics · CloudFront+WAF edge module · Kubecost showback.
+Multi-region active/active · private-only API endpoint + VPN · shared OIDC
+broker in front of the per-app GitHub SSO ([ADR-0019](docs/adr/0019-github-sso.md))
+· CUR 2.0 → Athena deep cost lineage (flag exists) · Velero (when a stateful
+workload lands) · Thanos/Mimir long-term metrics · CloudFront+WAF edge module ·
+Kubecost showback.
 
 ## License
 
