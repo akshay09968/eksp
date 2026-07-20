@@ -37,6 +37,29 @@ audit method (run suites repeatedly, don't trust one green run) earns its cost.
 | P2-11/12 refactors (issue #8) | ✅ `costs/service.go` split into service/aggregate/summary; the S3-backend init block now lives once in `.github/actions/tf-init` (used by plan, apply, drift) |
 | Access logs + retention (issue #4) | ✅ per-env encrypted LB-log bucket in `modules/network` (TLS-only, lifecycle-expiring); dev ALB + staging/prod NLB-gateway overlays wired; control-plane log group gets explicit retention. GDPR: PII source + expiry shipped together |
 
+## Debt review (2026-07-20) — `/debt-review` cycle 2
+
+**1 new finding, filed as #19.** The `terraform` CI workflow has been **red on
+every push since inception** (6/6, 2026-07-11→18): the `checkov` job hard-fails
+because its skip list (CKV_AWS_39/38 only) was never reconciled with the 23
+checks checkov actually reports — mostly accepted-by-policy (CKV_TF_1 vs
+ADR-0001's `~>`+Renovate pinning; CKV_AWS_274 AdministratorAccess) or
+false-positive, with two cheap real ones (ECR KMS, CKV_AWS_136). It stayed
+invisible because **`make check` doesn't run checkov** despite Makefile+CLAUDE.md
+calling it "everything CI runs" — the honesty gap that let 6 red pushes slip.
+Evidence: `gh run list --workflow=terraform.yml`, run 29623942540 `--log-failed`.
+
+**Checked clean:** `make check` green (fmt, tflint, validate ×4, tf-test,
+helm-lint, kubeconform **0 skips**, app tests, env-parity, chart-skew);
+all actions SHA-pinned + actionlint clean; strict chart-skew clean; env-parity
+identical; **zero** TODO/FIXME/XXX; AMI pins 11d old (`al2023@v20260709`, <90d);
+k8s 1.33 pinned+EOL-annotated; state replication still configured, nothing new
+stateful in gitops/; gitleaks + k8s-validate workflows green on recent pushes.
+
+**Standing (not re-filed):** Renovate app still not enabled (0 PRs ever) — now
+load-bearing, since AMI/k8s/dep pins won't move without it; nightly drift
+"skipped" by design (public-repo gating, AUDIT P0-2).
+
 ## Debt review (2026-07-18) — first `/debt-review` cycle
 
 Filed and closed #11–#18 same cycle (commits `5242fef…b63eb40`). Findings:
